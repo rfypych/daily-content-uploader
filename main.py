@@ -63,7 +63,33 @@ app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 templates = Jinja2Templates(directory=TEMPLATES_FOLDER)
 
 # File upload settings
-MAX_FILE_SIZE = int(os.getenv("MAX_FILE_SIZE", "104857600"))  # 100MB default
+# Parse MAX_FILE_SIZE with unit support (e.g., "100MB", "50MB")
+def parse_file_size(size_str):
+    """Parse file size string like '100MB' to bytes"""
+    if not size_str:
+        return 104857600  # 100MB default
+    
+    size_str = size_str.upper().strip()
+    
+    # If it's already a number, return as int
+    if size_str.isdigit():
+        return int(size_str)
+    
+    # Parse size with unit
+    units = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3}
+    
+    for unit in units:
+        if size_str.endswith(unit):
+            try:
+                number = float(size_str[:-len(unit)])
+                return int(number * units[unit])
+            except ValueError:
+                break
+    
+    # Fallback to default if parsing fails
+    return 104857600  # 100MB default
+
+MAX_FILE_SIZE = parse_file_size(os.getenv("MAX_FILE_SIZE", "100MB"))
 ALLOWED_EXTENSIONS = os.getenv("ALLOWED_EXTENSIONS", "jpg,jpeg,png,gif,mp4,mov,avi").split(",")
 
 # Initialize content uploader
