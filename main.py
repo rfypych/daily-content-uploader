@@ -12,7 +12,7 @@ from datetime import datetime
 import shutil
 from contextlib import asynccontextmanager
 
-from database import SessionLocal, engine, Base
+from database import SessionLocal, engine, Base, init_database
 from models import Content, Schedule, Account
 from automation import ContentUploader
 
