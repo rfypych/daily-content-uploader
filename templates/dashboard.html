@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Content Uploader - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center py-4">
+                    <h1 class="text-2xl font-bold text-gray-900">
+                        <i class="fas fa-calendar-alt text-blue-600 mr-2"></i>
+                        Daily Content Uploader
+                    </h1>
+                    <div class="flex space-x-4">
+                        <button onclick="showUploadModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                            <i class="fas fa-plus mr-2"></i>Upload Konten
+                        </button>
+                        <button onclick="showScheduleModal()" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition">
+                            <i class="fas fa-clock mr-2"></i>Jadwal Harian
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-blue-100 rounded-full">
+                            <i class="fas fa-images text-blue-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Total Konten</p>
+                            <p class="text-2xl font-bold text-gray-900">{{ contents|length }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-green-100 rounded-full">
+                            <i class="fas fa-clock text-green-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Jadwal Pending</p>
+                            <p class="text-2xl font-bold text-gray-900">{{ schedules|length }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-purple-100 rounded-full">
+                            <i class="fab fa-instagram text-purple-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">Instagram</p>
+                            <p class="text-2xl font-bold text-gray-900">Aktif</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-sm">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-pink-100 rounded-full">
+                            <i class="fab fa-tiktok text-pink-600"></i>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-gray-600">TikTok</p>
+                            <p class="text-2xl font-bold text-gray-900">Aktif</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Content Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Recent Content -->
+                <div class="bg-white rounded-lg shadow-sm">
+                    <div class="p-6 border-b">
+                        <h2 class="text-lg font-semibold text-gray-900">Konten Terbaru</h2>
+                    </div>
+                    <div class="p-6">
+                        {% if contents %}
+                            <div class="space-y-4">
+                                {% for content in contents %}
+                                <div class="flex items-center justify-between p-4 border rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                            {% if content.file_type and 'image' in content.file_type %}
+                                                <i class="fas fa-image text-gray-600"></i>
+                                            {% else %}
+                                                <i class="fas fa-video text-gray-600"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="font-medium text-gray-900">{{ content.filename }}</p>
+                                            <p class="text-sm text-gray-500">
+                                                {{ content.platform.title() }} • 
+                                                <span class="{% if content.status == 'published' %}text-green-600{% elif content.status == 'failed' %}text-red-600{% else %}text-yellow-600{% endif %}">
+                                                    {{ content.status.title() }}
+                                                </span>
+                                                {% if content.file_size %}
+                                                    • {{ "%.1f"|format(content.file_size / 1024 / 1024) }}MB
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        {% if content.status != 'published' %}
+                                        <button data-content-id="{{ content.id }}" data-platform="{{ content.platform }}"
+                                                class="publish-btn text-blue-600 hover:text-blue-800 p-2 rounded hover:bg-blue-50"
+                                                title="Publish Content">
+                                            <i class="fas fa-share"></i>
+                                        </button>
+                                        {% endif %}
+                                        <button data-content-id="{{ content.id }}"
+                                                class="delete-btn text-red-600 hover:text-red-800 p-2 rounded hover:bg-red-50"
+                                                title="Delete Content">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-8">
+                                <i class="fas fa-images text-gray-400 text-4xl mb-4"></i>
+                                <p class="text-gray-500">Belum ada konten yang diupload</p>
+                                <p class="text-sm text-gray-400 mt-2">Klik "Upload Konten" untuk memulai</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Scheduled Posts -->
+                <div class="bg-white rounded-lg shadow-sm">
+                    <div class="p-6 border-b">
+                        <h2 class="text-lg font-semibold text-gray-900">Jadwal Posting</h2>
+                    </div>
+                    <div class="p-6">
+                        {% if schedules %}
+                            <div class="space-y-4">
+                                {% for schedule in schedules %}
+                                <div class="flex items-center justify-between p-4 border rounded-lg">
+                                    <div class="flex items-center">
+                                        <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                            {% if schedule.platform == 'instagram' %}
+                                                <i class="fab fa-instagram text-purple-600"></i>
+                                            {% else %}
+                                                <i class="fab fa-tiktok text-pink-600"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="font-medium text-gray-900">{{ schedule.platform.title() }}</p>
+                                            <p class="text-sm text-gray-500">{{ schedule.scheduled_time.strftime('%d/%m/%Y %H:%M') }}</p>
+                                        </div>
+                                    </div>
+                                    <span class="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">
+                                        {{ schedule.status.title() }}
+                                    </span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-8">
+                                <i class="fas fa-clock text-gray-400 text-4xl mb-4"></i>
+                                <p class="text-gray-500">Belum ada jadwal posting</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-white rounded-lg max-w-md w-full p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Upload Konten Baru</h3>
+                    <button onclick="hideUploadModal()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">File</label>
+                            <input type="file" name="file" accept="image/*,video/*" required
+                                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Caption</label>
+                            <textarea name="caption" rows="3" required
+                                      class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                      placeholder="Tulis caption untuk konten..."></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+                            <select name="platform" required
+                                    class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                                <option value="">Pilih Platform</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="tiktok">TikTok</option>
+                                <option value="both">Keduanya</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Jadwal (Opsional)</label>
+                            <input type="datetime-local" name="schedule_time"
+                                   class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="hideUploadModal()" 
+                                class="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">
+                            Batal
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Modal functions
+        function showUploadModal() {
+            document.getElementById('uploadModal').classList.remove('hidden');
+        }
+
+        function hideUploadModal() {
+            document.getElementById('uploadModal').classList.add('hidden');
+        }
+
+        // Upload form handler
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    alert('Konten berhasil diupload!');
+                    location.reload();
+                } else {
+                    alert('Gagal upload konten');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Event listeners for publish and delete buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            // Publish content buttons
+            document.querySelectorAll('.publish-btn').forEach(button => {
+                button.addEventListener('click', async function() {
+                    const contentId = this.dataset.contentId;
+                    const platform = this.dataset.platform;
+                    
+                    if (confirm('Publish konten sekarang?')) {
+                        try {
+                            const response = await fetch(`/publish/${contentId}?platform=${platform}`, {
+                                method: 'POST'
+                            });
+                            
+                            if (response.ok) {
+                                alert('Konten berhasil dipublish!');
+                                location.reload();
+                            } else {
+                                alert('Gagal publish konten');
+                            }
+                        } catch (error) {
+                            alert('Error: ' + error.message);
+                        }
+                    }
+                });
+            });
+
+            // Delete content buttons
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', async function() {
+                    const contentId = this.dataset.contentId;
+                    
+                    if (confirm('Hapus konten ini?')) {
+                        try {
+                            const response = await fetch(`/content/${contentId}`, {
+                                method: 'DELETE'
+                            });
+                            
+                            if (response.ok) {
+                                alert('Konten berhasil dihapus!');
+                                location.reload();
+                            } else {
+                                alert('Gagal hapus konten');
+                            }
+                        } catch (error) {
+                            alert('Error: ' + error.message);
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
