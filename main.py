@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 from database import SessionLocal, engine, Base, init_database, get_db
 from models import Content, Schedule, Account
 from automation import ContentUploader
+from scheduler import scheduler
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -39,11 +40,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
     logger.info(f"Database URL: {os.getenv('DATABASE_URL', 'Not configured')}")
     
+    # Start scheduler
+    await scheduler.start()
+    logger.info("Content scheduler started")
+    
     yield
     
     # Shutdown
     logger.info("Shutting down Daily Content Uploader...")
     await uploader.close_browser()
+    await scheduler.stop()
+    logger.info("Content scheduler stopped")
 
 # FastAPI app with lifespan
 app = FastAPI(
@@ -208,6 +215,11 @@ async def upload_content(
                 )
                 db.add(new_schedule)
                 db.commit()
+                db.refresh(new_schedule)
+                
+                # Add to scheduler
+                await scheduler.schedule_upload(new_schedule)
+                
             except ValueError:
                 logger.warning(f"Invalid schedule time format: {schedule_time}")
         
@@ -321,6 +333,42 @@ async def get_contents(skip: int = 0, limit: int = 100, db: Session = Depends(ge
         ]}
     except Exception as e:
         logger.error(f"Error getting contents: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/schedule/daily")
+async def create_daily_schedule(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """Create daily recurring schedule"""
+    try:
+        content_id = request.get("content_id")
+        platform = request.get("platform")
+        time_str = request.get("time")  # Format: "HH:MM"
+        
+        if not all([content_id, platform, time_str]):
+            raise HTTPException(status_code=400, detail="Missing required fields")
+        
+        # Parse time
+        try:
+            hour, minute = map(int, time_str.split(":"))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid time format")
+        
+        # Check if content exists
+        content = db.query(Content).filter(Content.id == content_id).first()
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+        
+        # Add daily schedule
+        await scheduler.add_daily_schedule(content_id, platform, hour, minute)
+        
+        return {"message": "Daily schedule created successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating daily schedule: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":

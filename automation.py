@@ -159,27 +159,43 @@ class ContentUploader:
         """Upload content to specified platform"""
         db = SessionLocal()
         try:
-            # Get account credentials
-            account = db.query(Account).filter(
-                Account.platform == platform,
-                Account.is_active == True
-            ).first()
-            
-            if not account:
-                logger.error(f"No active account found for platform: {platform}")
-                return False
-            
-            # Upload based on platform
-            if platform == "instagram":
-                return await self.upload_to_instagram(content, account.username, account.password)
-            elif platform == "tiktok":
-                return await self.upload_to_tiktok(content, account.username, account.password)
+            # Handle 'both' platform by uploading to both Instagram and TikTok
+            if platform == "both":
+                instagram_success = await self._upload_to_single_platform(content, "instagram", db)
+                tiktok_success = await self._upload_to_single_platform(content, "tiktok", db)
+                return instagram_success or tiktok_success  # Success if at least one succeeds
             else:
-                logger.error(f"Unsupported platform: {platform}")
-                return False
+                return await self._upload_to_single_platform(content, platform, db)
                 
         finally:
             db.close()
+    
+    async def _upload_to_single_platform(self, content: Content, platform: str, db) -> bool:
+        """Upload content to a single platform"""
+        # Get account credentials
+        account = db.query(Account).filter(
+            Account.platform == platform,
+            Account.is_active == True
+        ).first()
+        
+        if not account:
+            logger.error(f"No active account found for platform: {platform}")
+            return False
+        
+        # Decrypt password
+        password = account.get_password()
+        if not password:
+            logger.error(f"Could not decrypt password for {platform} account")
+            return False
+        
+        # Upload based on platform
+        if platform == "instagram":
+            return await self.upload_to_instagram(content, account.username, password)
+        elif platform == "tiktok":
+            return await self.upload_to_tiktok(content, account.username, password)
+        else:
+            logger.error(f"Unsupported platform: {platform}")
+            return False
 
 # Utility function for testing
 async def test_upload():
