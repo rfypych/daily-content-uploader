@@ -112,7 +112,7 @@ python main.py           # Start server
 
 <div align="center">
 
-🎉 **Akses Dashboard:** http://localhost:8000
+🎉 **Akses Dashboard:** http://localhost:2009
 
 </div>
 
@@ -192,6 +192,10 @@ DEBUG=false
 ENVIRONMENT=production
 UPLOAD_FOLDER=/var/www/html/uploads
 MAX_FILE_SIZE=100MB
+
+# Server Settings
+PORT=2009
+HOST=0.0.0.0
 ```
 
 </details>
@@ -356,6 +360,7 @@ for i, content in enumerate(content_list):
 | 📤 **Upload Speed** | ~30 seconds per post |
 | 🗄️ **Database Operations** | <100ms response time |
 | 🌐 **Web Dashboard** | <2 second load time |
+| 🔌 **Default Port** | 2009 (configurable) |
 | 🤖 **Browser Automation** | 99.5% success rate |
 | 💾 **Memory Usage** | <512MB RAM |
 | 🔄 **Concurrent Users** | Up to 100 users |
@@ -399,6 +404,9 @@ tail -f /var/log/apache2/error.log
 
 # Restart Apache
 systemctl restart apache2
+
+# Check if port 2009 is available
+netstat -tlnp | grep :2009
 ```
 
 </details>

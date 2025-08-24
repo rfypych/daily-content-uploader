@@ -1,24 +1,24 @@
-from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request, UploadFile, File, Form
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Request
-import uvicorn
+from sqlalchemy.orm import Session
 from pathlib import Path
 import os
+import logging
+import uvicorn
 from datetime import datetime
-from database import engine, SessionLocal, Base, init_database, get_db
+import shutil
+from contextlib import asynccontextmanager
+
+from database import SessionLocal, engine, Base
 from models import Content, Schedule, Account
 from automation import ContentUploader
-import logging
-from dotenv import load_dotenv
-from sqlalchemy.orm import Session
-import aiofiles
-from typing import List
 
-# Load environment variables
-load_dotenv()
+# Create database tables
+Base.metadata.create_all(bind=engine)
+print("Database tables created successfully")
 
 # Setup logging
 logging.basicConfig(
@@ -27,11 +27,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app
+# Initialize content uploader
+uploader = ContentUploader()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown"""
+    # Startup
+    logger.info("Starting Daily Content Uploader...")
+    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
+    logger.info(f"Database URL: {os.getenv('DATABASE_URL', 'Not configured')}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Daily Content Uploader...")
+    await uploader.close_browser()
+
+# FastAPI app with lifespan
 app = FastAPI(
-    title="Daily Content Uploader", 
+    title="Daily Content Uploader",
+    description="Automated Instagram & TikTok Content Upload System",
     version="1.0.0",
-    debug=os.getenv("DEBUG", "false").lower() == "true"
+    lifespan=lifespan
 )
 
 # CORS middleware
@@ -92,21 +110,6 @@ def parse_file_size(size_str):
 MAX_FILE_SIZE = parse_file_size(os.getenv("MAX_FILE_SIZE", "100MB"))
 ALLOWED_EXTENSIONS = os.getenv("ALLOWED_EXTENSIONS", "jpg,jpeg,png,gif,mp4,mov,avi").split(",")
 
-# Initialize content uploader
-uploader = ContentUploader()
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize application on startup"""
-    logger.info("Starting Daily Content Uploader...")
-    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
-    logger.info(f"Database URL: {os.getenv('DATABASE_URL', 'Not configured')}")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown"""
-    logger.info("Shutting down Daily Content Uploader...")
-    await uploader.close_browser()
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request, db: Session = Depends(get_db)):
@@ -320,7 +323,7 @@ async def get_contents(skip: int = 0, limit: int = 100, db: Session = Depends(ge
         raise HTTPException(status_code=500, detail="Internal server error")
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
+    port = int(os.getenv("PORT", 2009))
     host = os.getenv("HOST", "0.0.0.0")
     reload = os.getenv("DEBUG", "false").lower() == "true"
     
