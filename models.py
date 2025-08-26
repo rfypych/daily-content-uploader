@@ -8,11 +8,12 @@ class Content(Base):
     __tablename__ = "contents"
     
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)
+    filename = Column(String(255), nullable=False) # For single files, the name. For albums, a descriptive name.
+    file_path = Column(String(4096), nullable=False) # For albums, paths are comma-separated
     caption = Column(Text)
-    platform = Column(String(50), nullable=False)  # instagram, tiktok, both
-    file_type = Column(String(100))  # image/video, video/mp4, etc
+    platform = Column(String(50), nullable=False, default="instagram")
+    post_type = Column(String(50), default="photo") # photo, video, reel, album, story
+    file_type = Column(String(100))  # image/jpeg, video/mp4, etc. For albums, the type of the first file.
     file_size = Column(Integer)  # File size in bytes
     status = Column(String(50), default="uploaded")  # uploaded, scheduled, published, failed
     created_at = Column(DateTime, default=datetime.utcnow)
