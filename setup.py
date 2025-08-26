@@ -1,12 +1,13 @@
 import os
+import sys
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from instagrapi import Client
 from instagrapi.exceptions import LoginRequired
 
-from database import init_database, SessionLocal
-from models import Account
+from database import init_database, SessionLocal, engine
+from models import Account, Base
 
 # --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
@@ -18,7 +19,7 @@ SESSION_FILE = Path("session.json")
 
 # --- Functions ---
 
-def setup_database_and_accounts():
+def setup_database_and_accounts(reset_db=False):
     """Initializes the database and creates the Instagram account entry if it doesn't exist."""
     logging.info("--- Langkah 1: Menyiapkan Database ---")
     db_url = os.getenv('DATABASE_URL')
@@ -27,6 +28,11 @@ def setup_database_and_accounts():
         return False
 
     try:
+        if reset_db:
+            logging.warning("⚠️ Flag --reset-db terdeteksi. Menghapus semua tabel dari database...")
+            Base.metadata.drop_all(bind=engine)
+            logging.info("✅ Semua tabel telah dihapus.")
+
         init_database()
         logging.info("✅ Database dan tabel berhasil dibuat.")
 
@@ -36,7 +42,6 @@ def setup_database_and_accounts():
             existing = db.query(Account).filter_by(platform="instagram", username=INSTAGRAM_USERNAME).first()
             if not existing:
                 account = Account(platform="instagram", username=INSTAGRAM_USERNAME, is_active=True)
-                # The password stored in the DB is not used by instagrapi, but we set it for consistency
                 if INSTAGRAM_PASSWORD:
                     account.set_password(INSTAGRAM_PASSWORD)
                 db.add(account)
@@ -111,7 +116,16 @@ if __name__ == "__main__":
     print("untuk login pertama kali ke Instagram.")
     print("-----------------------------------------------------")
 
-    if setup_database_and_accounts():
-        perform_interactive_login()
+    # Check for --reset-db flag
+    reset_db_flag = "--reset-db" in sys.argv
+
+    if setup_database_and_accounts(reset_db=reset_db_flag):
+        # Only perform login if the DB setup was successful
+        if not reset_db_flag:
+             # Don't ask for login again if user is just resetting the DB
+             # They should run separately if they want to do both.
+            perform_interactive_login()
+        else:
+            logging.info("Database telah di-reset. Jalankan skrip lagi tanpa flag --reset-db untuk login.")
 
     print("\nProses setup selesai.")
