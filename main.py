@@ -157,74 +157,68 @@ def validate_file(file: UploadFile) -> bool:
     
     return True
 
+from typing import List
+
 @app.post("/upload")
 async def upload_content(
-    file: UploadFile = File(...),
-    caption: str = Form(...),
-    platform: str = Form(...),
-    schedule_time: str = Form(None),
+    files: List[UploadFile] = File(...),
+    caption: str = Form(""),
+    post_type: str = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Upload konten baru"""
-    try:
-        # Validate file
+    """Handles all new content uploads from the dynamic dashboard."""
+
+    if not files:
+        raise HTTPException(status_code=400, detail="No files were uploaded.")
+
+    total_size = 0
+    file_paths = []
+    primary_filename = files[0].filename
+    primary_file_type = files[0].content_type
+
+    for file in files:
         if not validate_file(file):
-            raise HTTPException(status_code=400, detail="File type not allowed")
+            raise HTTPException(status_code=400, detail=f"File type not allowed for {file.filename}")
         
-        # Read file content
         file_content = await file.read()
         file_size = len(file_content)
+        total_size += file_size
         
-        # Check file size
-        if file_size > MAX_FILE_SIZE:
-            raise HTTPException(status_code=400, detail="File too large")
-        
-        # Generate unique filename
+        if total_size > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail=f"Total file size exceeds limit of {MAX_FILE_SIZE / 1024**2}MB")
+
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        file_extension = file.filename.split(".")[-1]
         unique_filename = f"{timestamp}_{file.filename}"
         file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
         
-        # Save file
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(file_content)
-        
-        # Save to database
+        file_paths.append(file_path)
+
+    # For albums, store paths as a comma-separated string.
+    db_file_path = ",".join(file_paths)
+    db_filename = f"Album of {len(files)} items" if post_type == "album" else primary_filename
+
+    try:
         new_content = Content(
-            filename=file.filename,
-            file_path=file_path,
+            filename=db_filename,
+            file_path=db_file_path,
             caption=caption,
-            platform=platform,
-            file_type=file.content_type,
-            file_size=file_size,
-            status="uploaded"
+            platform="instagram", # Hardcoded as we only support Instagram now
+            post_type=post_type,
+            file_type=primary_file_type,
+            file_size=total_size,
+            status="uploaded" # This is now a generic content entry, not yet scheduled
         )
         db.add(new_content)
         db.commit()
         db.refresh(new_content)
         
-        # Create schedule if provided
-        if schedule_time:
-            try:
-                schedule_dt = datetime.fromisoformat(schedule_time)
-                new_schedule = Schedule(
-                    content_id=new_content.id,
-                    platform=platform,
-                    scheduled_time=schedule_dt,
-                    status="pending"
-                )
-                db.add(new_schedule)
-                db.commit()
-                db.refresh(new_schedule)
-                
-                # Add to scheduler
-                await scheduler.schedule_upload(new_schedule)
-                
-            except ValueError:
-                logger.warning(f"Invalid schedule time format: {schedule_time}")
+        # The new flow doesn't schedule on upload, but on manual publish/schedule click.
+        # This simplifies the upload endpoint. Scheduling is handled by other endpoints.
         
-        logger.info(f"Content uploaded successfully: {new_content.id}")
-        return {"message": "Konten berhasil diupload", "content_id": new_content.id}
+        logger.info(f"Content entry created successfully: ID {new_content.id}, Type: {post_type}")
+        return {"message": "Konten berhasil diunggah dan disimpan.", "content_id": new_content.id}
         
     except HTTPException:
         raise

@@ -3,56 +3,83 @@ import logging
 from models import Content
 from database import SessionLocal
 
-# Import the new uploader
-from instagram_api import upload_video_with_instagrapi
+# Import the new specific uploader functions
+from instagram_api import (
+    upload_photo,
+    upload_video,
+    upload_reel,
+    upload_album,
+    upload_story
+)
 
 logger = logging.getLogger(__name__)
 
 class ContentUploader:
     """
-    Manages the content uploading process.
-    Currently only supports Instagram.
+    Manages the content uploading process by routing to the correct uploader.
     """
     
     async def upload_to_instagram(self, content: Content) -> bool:
         """
-        Uploads content to Instagram using the instagrapi library.
+        Dispatches the content to the correct instagrapi upload function
+        based on the post_type stored in the Content object.
         """
-        logger.info("Starting Instagram upload using instagrapi...")
+        post_type = content.post_type
+        logger.info(f"Dispatching content {content.id} for Instagram upload as type: '{post_type}'")
+
+        # Define a mapping from post_type to the upload function
+        upload_functions = {
+            "photo": upload_photo,
+            "video": upload_video,
+            "reel": upload_reel,
+            "album": upload_album,
+            "story": upload_story,
+        }
+
+        upload_function = upload_functions.get(post_type)
+
+        if not upload_function:
+            logger.error(f"Unknown post type '{post_type}' for content ID {content.id}")
+            return False
+
         try:
             loop = asyncio.get_running_loop()
+
+            # Prepare arguments for the upload function
+            if post_type == "album":
+                # Album expects a list of paths
+                args = [content.file_path.split(','), content.caption]
+            elif post_type == "story":
+                # Story only needs a path
+                args = [content.file_path]
+            else:
+                # Others need path and caption
+                args = [content.file_path, content.caption]
+
             # Run the synchronous instagrapi function in a separate thread
             success = await loop.run_in_executor(
-                None,
-                upload_video_with_instagrapi,
-                content.file_path,
-                content.caption
+                None,       # Use the default executor
+                upload_function, # The specific function to call (e.g., upload_photo)
+                *args       # Unpack arguments
             )
+
             if success:
-                logger.info(f"Successfully uploaded content {content.id} to Instagram via instagrapi.")
+                logger.info(f"Successfully processed content {content.id} (type: {post_type}).")
             else:
-                logger.error(f"Failed to upload content {content.id} to Instagram via instagrapi.")
+                logger.error(f"Failed to process content {content.id} (type: {post_type}).")
             return success
+
         except Exception as e:
-            logger.error(f"An unexpected error occurred during instagrapi integration: {e}")
+            logger.error(f"An unexpected error occurred during dispatch for content {content.id}: {e}")
             return False
     
     async def upload_to_platform(self, content: Content, platform: str) -> bool:
         """
         Routes the content upload to the appropriate platform-specific method.
         """
-        db = SessionLocal()
-        try:
-            # The 'both' option is kept for potential future expansion,
-            # but currently only routes to Instagram.
-            if platform in ["instagram", "both"]:
-                return await self.upload_to_instagram(content)
-            else:
-                logger.error(f"Unsupported platform: '{platform}'. This application is currently configured for Instagram only.")
-                return False
-        finally:
-            db.close()
-
-# Note: The original _upload_to_single_platform, upload_to_tiktok,
-# and browser-related methods have been removed as they are no longer used.
-# The test_upload function is also removed as it was for the old implementation.
+        # This function now only supports 'instagram' but is kept for structural consistency.
+        if platform == "instagram":
+            return await self.upload_to_instagram(content)
+        else:
+            logger.error(f"Unsupported platform: '{platform}'. This application is currently configured for Instagram only.")
+            return False
