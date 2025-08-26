@@ -7,6 +7,9 @@ from database import SessionLocal
 import os
 from typing import Optional
 
+# Import the new uploader
+from instagram_api import upload_video_with_instagrapi
+
 logger = logging.getLogger(__name__)
 
 class ContentUploader:
@@ -36,69 +39,27 @@ class ContentUploader:
             await self.playwright.stop()
     
     async def upload_to_instagram(self, content: Content, username: str, password: str) -> bool:
-        """Upload content to Instagram"""
+        """
+        Upload content to Instagram using the instagrapi library.
+        The username and password arguments are ignored but kept for compatibility
+        with the calling function.
+        """
+        logger.info("Starting Instagram upload using instagrapi...")
         try:
-            if not self.browser:
-                await self.init_browser()
-                
-            page = await self.context.new_page()
-            
-            # Navigate to Instagram
-            await page.goto('https://www.instagram.com/accounts/login/')
-            await page.wait_for_load_state('networkidle')
-            
-            # Login
-            await page.fill('input[name="username"]', username)
-            await page.fill('input[name="password"]', password)
-            await page.click('button[type="submit"]')
-            
-            # Wait for login to complete
-            await page.wait_for_url('https://www.instagram.com/', timeout=30000)
-            
-            # Handle "Save Info" dialog if appears
-            try:
-                await page.click('button:has-text("Not Now")', timeout=5000)
-            except:
-                pass
-                
-            # Handle notifications dialog if appears
-            try:
-                await page.click('button:has-text("Not Now")', timeout=5000)
-            except:
-                pass
-            
-            # Click create new post
-            await page.click('svg[aria-label="New post"]')
-            await page.wait_for_selector('input[type="file"]')
-            
-            # Upload file
-            file_input = await page.query_selector('input[type="file"]')
-            await file_input.set_input_files(content.file_path)
-            
-            # Wait for upload and click Next
-            await page.wait_for_selector('button:has-text("Next")')
-            await page.click('button:has-text("Next")')
-            
-            # Skip crop/filter steps
-            await page.wait_for_selector('button:has-text("Next")')
-            await page.click('button:has-text("Next")')
-            
-            # Add caption
-            await page.wait_for_selector('textarea[aria-label="Write a caption..."]')
-            await page.fill('textarea[aria-label="Write a caption..."]', content.caption)
-            
-            # Share post
-            await page.click('button:has-text("Share")')
-            
-            # Wait for success
-            await page.wait_for_selector('img[alt="Animated checkmark"]', timeout=30000)
-            
-            await page.close()
-            logger.info(f"Successfully uploaded content {content.id} to Instagram")
-            return True
-            
+            loop = asyncio.get_running_loop()
+            success = await loop.run_in_executor(
+                None,  # Use the default executor
+                upload_video_with_instagrapi,  # The synchronous function to call
+                content.file_path,  # Arguments for the function
+                content.caption
+            )
+            if success:
+                logger.info(f"Successfully uploaded content {content.id} to Instagram via instagrapi.")
+            else:
+                logger.error(f"Failed to upload content {content.id} to Instagram via instagrapi.")
+            return success
         except Exception as e:
-            logger.error(f"Failed to upload to Instagram: {str(e)}")
+            logger.error(f"An unexpected error occurred during instagrapi integration: {e}")
             return False
     
     async def upload_to_tiktok(self, content: Content, username: str, password: str) -> bool:

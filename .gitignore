@@ -1,0 +1,20 @@
+# Environment variables
+.env
+
+# Session files
+session.json
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Uploads directory
+uploads/
