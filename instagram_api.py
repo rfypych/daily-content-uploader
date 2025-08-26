@@ -52,12 +52,10 @@ def _get_instagrapi_client() -> Client:
 def upload_photo(path: str, caption: str) -> bool:
     """Uploads a single photo to the Instagram feed."""
     cl = _get_instagrapi_client()
-    if not cl:
-        return False
+    if not cl: return False
     try:
         logging.info(f"Uploading photo from {path}...")
         cl.photo_upload(path, caption)
-        logging.info("Photo uploaded successfully.")
         return True
     except ValidationError:
         logging.warning("Caught expected Pydantic validation error, but photo upload was successful.")
@@ -69,12 +67,10 @@ def upload_photo(path: str, caption: str) -> bool:
 def upload_video(path: str, caption: str) -> bool:
     """Uploads a single video to the Instagram feed (not as a Reel)."""
     cl = _get_instagrapi_client()
-    if not cl:
-        return False
+    if not cl: return False
     try:
         logging.info(f"Uploading video from {path}...")
         cl.video_upload(path, caption)
-        logging.info("Video uploaded successfully.")
         return True
     except ValidationError:
         logging.warning("Caught expected Pydantic validation error, but video upload was successful.")
@@ -84,14 +80,12 @@ def upload_video(path: str, caption: str) -> bool:
         return False
 
 def upload_reel(path: str, caption: str) -> bool:
-    """Uploads a video as a Reel."""
+    """Uploads a video as a Reel. Note: instagrapi uses clip_upload for this."""
     cl = _get_instagrapi_client()
-    if not cl:
-        return False
+    if not cl: return False
     try:
         logging.info(f"Uploading Reel from {path}...")
-        cl.reel_upload(path, caption)
-        logging.info("Reel uploaded successfully.")
+        cl.clip_upload(path, caption)
         return True
     except ValidationError:
         logging.warning("Caught expected Pydantic validation error, but reel upload was successful.")
@@ -103,17 +97,15 @@ def upload_reel(path: str, caption: str) -> bool:
 def upload_album(paths: List[str], caption: str) -> bool:
     """Uploads multiple photos/videos as a carousel/album."""
     cl = _get_instagrapi_client()
-    if not cl:
-        return False
+    if not cl: return False
     # Validate paths
-    for p in paths:
-        if not Path(p).is_file():
-            logging.error(f"File not found in album paths: {p}")
-            return False
+    validated_paths = [p for p in paths if Path(p).is_file()]
+    if len(validated_paths) != len(paths):
+        logging.error(f"One or more files not found in album paths.")
+        return False
     try:
         logging.info(f"Uploading album with {len(paths)} media files...")
-        cl.album_upload(paths, caption)
-        logging.info("Album uploaded successfully.")
+        cl.album_upload(validated_paths, caption)
         return True
     except ValidationError:
         logging.warning("Caught expected Pydantic validation error, but album upload was successful.")
@@ -122,14 +114,19 @@ def upload_album(paths: List[str], caption: str) -> bool:
         logging.error(f"Failed to upload album: {e}")
         return False
 
-def upload_story(path: str) -> bool:
+def upload_story(path: str, file_type: str) -> bool:
     """Uploads a photo/video as a Story."""
     cl = _get_instagrapi_client()
-    if not cl:
-        return False
+    if not cl: return False
     try:
         logging.info(f"Uploading story from {path}...")
-        cl.story_upload(path)
+        if "image" in file_type:
+            cl.photo_upload_to_story(path)
+        elif "video" in file_type:
+            cl.video_upload_to_story(path)
+        else:
+            logging.error(f"Unsupported file type for story: {file_type}")
+            return False
         logging.info("Story uploaded successfully.")
         return True
     except ValidationError:
