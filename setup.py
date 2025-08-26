@@ -1,71 +1,117 @@
 import os
+import logging
 from pathlib import Path
 from dotenv import load_dotenv
+from instagrapi import Client
+from instagrapi.exceptions import LoginRequired
+
 from database import init_database, SessionLocal
 from models import Account
-import logging
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --- Configuration ---
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+load_dotenv()
 
-def create_accounts_from_env():
-    """
-    Creates or updates social media accounts in the database using credentials
-    from environment variables.
-    """
-    db = SessionLocal()
+INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
+INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
+SESSION_FILE = Path("session.json")
+
+# --- Functions ---
+
+def setup_database_and_accounts():
+    """Initializes the database and creates the Instagram account entry if it doesn't exist."""
+    logging.info("--- Langkah 1: Menyiapkan Database ---")
+    db_url = os.getenv('DATABASE_URL')
+    if not db_url:
+        logging.error("❌ DATABASE_URL tidak ditemukan di file .env. Silakan buat file .env dari .env.example.")
+        return False
+
     try:
-        logging.info("=== Setting up accounts from .env file ===")
-        # We only set up Instagram now, TikTok logic is removed.
-        accounts_to_create = [
-            {"platform": "instagram", "username_var": "INSTAGRAM_USERNAME", "password_var": "INSTAGRAM_PASSWORD"},
-        ]
+        init_database()
+        logging.info("✅ Database dan tabel berhasil dibuat.")
 
-        for acc_info in accounts_to_create:
-            username = os.getenv(acc_info["username_var"])
-            password = os.getenv(acc_info["password_var"])
-            platform = acc_info["platform"]
+        db = SessionLocal()
+        # Create Instagram account entry
+        if INSTAGRAM_USERNAME:
+            existing = db.query(Account).filter_by(platform="instagram", username=INSTAGRAM_USERNAME).first()
+            if not existing:
+                account = Account(platform="instagram", username=INSTAGRAM_USERNAME, is_active=True)
+                # The password stored in the DB is not used by instagrapi, but we set it for consistency
+                if INSTAGRAM_PASSWORD:
+                    account.set_password(INSTAGRAM_PASSWORD)
+                db.add(account)
+                db.commit()
+                logging.info(f"✅ Akun '{INSTAGRAM_USERNAME}' ditambahkan ke database.")
+            else:
+                logging.info(f"✅ Akun '{INSTAGRAM_USERNAME}' sudah ada di database.")
+        else:
+            logging.warning("⚠️ INSTAGRAM_USERNAME tidak diatur di .env, tidak dapat menambahkan akun ke DB.")
 
-            if not all([username, password]):
-                logging.warning(f"Skipping {platform}: credentials not fully set in .env")
-                continue
+        # Ensure upload folder exists
+        upload_folder = os.getenv('UPLOAD_FOLDER', './uploads')
+        Path(upload_folder).mkdir(parents=True, exist_ok=True)
+        logging.info(f"✅ Folder upload '{upload_folder}' siap.")
 
-            existing = db.query(Account).filter_by(platform=platform, username=username).first()
-            if existing:
-                logging.info(f"Account for {username} on {platform} already exists. Skipping.")
-                continue
-
-            account = Account(platform=platform, username=username, is_active=True)
-            account.set_password(password)
-            db.add(account)
-            db.commit()
-            logging.info(f"✅ {platform.title()} account '{username}' created successfully!")
-
+        return True
     except Exception as e:
-        logging.error(f"An error occurred during account creation: {e}")
-        db.rollback()
+        logging.error(f"❌ Gagal menyiapkan database: {e}")
+        return False
     finally:
         db.close()
 
+
+def perform_interactive_login():
+    """Performs the first-time interactive login to generate a session file."""
+    logging.info("\n--- Langkah 2: Login Interaktif ke Instagram ---")
+
+    if not all([INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD]):
+        logging.error("❌ INSTAGRAM_USERNAME atau INSTAGRAM_PASSWORD tidak ditemukan di file .env.")
+        return
+
+    if SESSION_FILE.exists():
+        logging.warning(f"⚠️ File '{SESSION_FILE}' sudah ada.")
+        overwrite = input("   Apakah Anda ingin login ulang dan menimpanya? (y/n): ").lower()
+        if overwrite != 'y':
+            logging.info("Login dibatalkan.")
+            return
+
+    cl = Client()
+
+    def challenge_code_handler(username, choice):
+        """Handles the 2FA challenge by asking the user for the code."""
+        while True:
+            try:
+                code = input(f"\n>>> Masukkan kode 6 digit yang dikirim ke email Anda untuk akun '{username}': ").strip()
+                if len(code) == 6 and code.isdigit():
+                    return code
+                else:
+                    print("   [Error] Kode tidak valid. Harap masukkan 6 digit angka.")
+            except (KeyboardInterrupt, EOFError):
+                print("\nLogin dibatalkan.")
+                return None
+
+    cl.challenge_code_handler = challenge_code_handler
+
+    try:
+        logging.info(f"Mencoba login sebagai {INSTAGRAM_USERNAME}...")
+        cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        cl.dump_settings(SESSION_FILE)
+        logging.info(f"✅ Login berhasil! Sesi disimpan di '{SESSION_FILE}'.")
+        logging.info("✅ Anda sekarang dapat menjalankan server utama dengan 'python3 main.py'.")
+    except Exception as e:
+        logging.error(f"❌ Gagal login: {e}")
+
+# --- Main Execution ---
+
 if __name__ == "__main__":
-    logging.info("=== Non-Interactive Database and Account Setup ===")
-    load_dotenv()
+    print("=====================================================")
+    print("  Setup Aplikasi Daily Content Uploader  ")
+    print("=====================================================")
+    print("Skrip ini akan menyiapkan database dan memandu Anda")
+    print("untuk login pertama kali ke Instagram.")
+    print("-----------------------------------------------------")
 
-    db_url = os.getenv('DATABASE_URL')
-    if not db_url:
-        logging.error("❌ DATABASE_URL not configured in .env file")
-    else:
-        logging.info(f"Database URL: {db_url}")
-        logging.info("1. Creating database tables...")
-        init_database()
-        logging.info("✅ Tables created.")
+    if setup_database_and_accounts():
+        perform_interactive_login()
 
-        logging.info("\n2. Creating accounts from .env...")
-        create_accounts_from_env()
-        logging.info("✅ Account setup complete.")
-
-    # Also create the upload directory if it doesn't exist
-    upload_folder = os.getenv('UPLOAD_FOLDER', './uploads')
-    Path(upload_folder).mkdir(parents=True, exist_ok=True)
-    logging.info(f"✅ Upload directory '{upload_folder}' ensured.")
-
-    logging.info("\n🎉 Setup finished successfully.")
+    print("\nProses setup selesai.")

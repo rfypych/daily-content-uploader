@@ -1,132 +1,157 @@
 <div align="center">
 
+[**English**](#) | [**Bahasa Indonesia**](./README_ID.md)
+
 # 🚀 Instagram Content Uploader
 
-### *Otomasi Posting Instagram yang Simpel dan Powerful*
+### *A Simple and Powerful Instagram Automation Tool*
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-green.svg)](https://fastapi.tiangolo.com)
 [![instagrapi](https://img.shields.io/badge/instagrapi-2.2.1-purple.svg)](https://github.com/subzeroid/instagrapi)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**🎯 Set & Forget - Upload dan jadwalkan konten Instagram 24/7 tanpa intervensi manual!**
+**🎯 Set & Forget - Upload and schedule Instagram content 24/7 without manual intervention!**
 
-[🚀 Panduan Cepat](#-panduan-cepat) • [✨ Fitur Utama](#-fitur-utama) • [⚙️ Alur Kerja](#️-alur-kerja-aplikasi)
+[🚀 Quick Start Guide](#-quick-start--setup-guide) • [✨ Key Features](#-key-features)
 
 ---
 
 </div>
 
-## ✨ **Fitur Utama**
+## ✨ **Key Features**
 
 <div align="center">
 
 | 🎯 **Core Features** | 🔧 **Technical Features** | 🚀 **Advanced Features** |
 |:---:|:---:|:---:|
-| 📱 **Instagram Automation**<br/>Fokus pada satu platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>APScheduler Integration |
-| 📅 **Auto Scheduling**<br/>Set & Forget | 🗄️ **Database Management**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Login aman & efisien |
+| 📱 **Instagram Automation**<br/>Focus on a single platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>APScheduler Integration |
+| 📅 **Auto Scheduling**<br/>Set & Forget | 🗄️ **Database Management**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Secure & efficient login |
 | 🎨 **Web Dashboard**<br/>Modern UI/UX | 🌐 **Production Ready**<br/>Gunicorn + Web Server | 📊 **Analytics & Monitoring**<br/>Real-time Status |
 
 </div>
 
 ---
 
-## 🚀 **Panduan Cepat & Alur Kerja**
+## 🚀 **Quick Start & Setup Guide**
 
-Bagian ini menjelaskan cara kerja aplikasi dari awal hingga akhir, termasuk cara deploy di server Anda sendiri (misalnya menggunakan aaPanel).
+Follow these two main steps to get the application running.
 
-### ⚙️ **Alur Kerja Aplikasi**
+### **Step 1: Initial Setup (One-Time Only)**
 
-Aplikasi ini menggunakan library `instagrapi` untuk berinteraksi dengan API internal (private) Instagram. Ini berbeda dari otomasi browser dan lebih stabil, tetapi memiliki alur kerja login yang spesifik.
+This step prepares the configuration, database, and most importantly, performs the first-time login to Instagram to save your session.
 
-**Penting: Proses Login Pertama Kali**
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/rfypych/daily-content-uploader.git
+    cd daily-content-uploader
+    ```
 
-1.  **Login Awal:** Saat aplikasi pertama kali mencoba mengunggah sesuatu, `instagrapi` akan melakukan login menggunakan `INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD` dari file `.env` Anda.
-2.  **Tantangan Keamanan (2FA):** Karena ini adalah login dari lokasi baru (server Anda), Instagram kemungkinan besar akan meminta verifikasi. `instagrapi` akan mendeteksi ini dan akan **berhenti dan menunggu input di konsol/terminal Anda**. Anda akan melihat prompt yang meminta kode 6 digit.
-3.  **Masukkan Kode:** Periksa email yang terhubung dengan akun Instagram Anda, dapatkan kode 6 digit tersebut, dan masukkan ke dalam terminal tempat Anda menjalankan aplikasi.
-4.  **Pembuatan Sesi:** Setelah kode dimasukkan dengan benar, login akan berhasil, dan `instagrapi` akan secara otomatis membuat file `session.json`. File ini berisi "kunci" sesi yang membuktikan bahwa perangkat Anda (server) sudah terverifikasi.
-5.  **Login Berikutnya:** Untuk semua proses unggah di masa mendatang, aplikasi akan memuat `session.json` dan dapat login tanpa memerlukan nama pengguna, kata sandi, atau kode verifikasi lagi. Ini membuat prosesnya cepat dan aman.
+2.  **Install Dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-> **CATATAN:** Pastikan Anda menjalankan aplikasi di terminal secara langsung (bukan sebagai service di latar belakang) untuk pertama kalinya agar Anda dapat melihat prompt untuk memasukkan kode 2FA.
+3.  **Configure Environment:** Copy the example file to a new `.env` file.
+    ```bash
+    cp .env.example .env
+    ```
+    Open the `.env` file and fill in your Instagram credentials (`INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`). You can also change the `PORT` if needed.
 
-### 📋 **Panduan Penggunaan Dasbor**
+4.  **Run the Interactive Setup Script:** Run the `setup.py` script from your terminal.
+    ```bash
+    python3 setup.py
+    ```
+    - This script will create the database (`daily_content.db`).
+    - It will then attempt to log in to Instagram.
+    - **IMPORTANT:** Instagram will likely send a 2FA verification code to your email. The script will pause and prompt you to enter the 6-digit code in the terminal.
+    - After the correct code is entered, the login will succeed, and the script will create a `session.json` file. This file is your key to automatic logins in the future.
 
-Setelah aplikasi berjalan, Anda dapat mengakses dasbor web (misalnya, di `http://your_domain:2009`).
+Once `setup.py` is complete and `session.json` has been successfully created, you are ready for the next step.
 
-1.  **Upload Konten:** Klik tombol "Upload Konten". Isi form, pilih file video/gambar, tulis caption, dan klik "Upload". Konten akan disimpan di database dan siap untuk diposting.
-2.  **Posting Langsung:** Di daftar "Konten Terbaru", klik ikon "share" (panah) untuk langsung mempublikasikan konten tersebut ke Instagram.
-3.  **Menjadwalkan Posting:** Anda dapat menjadwalkan postingan untuk waktu tertentu saat mengunggah, atau membuat jadwal harian dari menu "Jadwal Harian". Penjadwal akan secara otomatis memprosesnya pada waktu yang ditentukan.
+### **Step 2: Running the Main Application Server**
 
-### 🛠️ **Langkah-langkah Deployment di aaPanel**
+After the initial setup is done, you can run the main web server at any time.
 
-Berikut adalah panduan langkah demi langkah untuk mendeploy aplikasi ini di server Anda menggunakan aaPanel.
+-   **For Development:**
+    ```bash
+    python3 main.py
+    ```
+-   **For Production:** It is recommended to use Gunicorn.
+    ```bash
+    gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
+    ```
+    (Replace `2009` with the port you set in your `.env` if you changed it).
 
-**1. Persiapan di aaPanel:**
-   - Buka aaPanel Anda.
-   - Pergi ke menu **Website** -> **Add site**.
-   - Buat website baru untuk domain atau subdomain Anda. Pastikan Anda juga membuat database MySQL jika Anda ingin menggunakannya (opsional, SQLite lebih mudah untuk memulai).
+You can now access the web dashboard at `http://your_server_address:PORT` to start uploading and scheduling content.
 
-**2. Upload Kode:**
-   - Pergi ke menu **Files**.
-   - Navigasi ke direktori root website yang baru saja Anda buat (misalnya, `/www/wwwroot/domain.com`).
-   - Hapus file default seperti `index.html`.
-   - Upload semua file dari repositori ini ke direktori tersebut.
+---
 
-**3. Setup Lingkungan Python:**
-   - Pergi ke menu **App Store**.
-   - Cari dan install **Python Manager**.
-   - Di dalam Python Manager, install versi Python yang sesuai (misalnya, 3.10 atau 3.11).
-   - Kembali ke pengaturan **Website** Anda, pilih situs Anda, dan klik **Python Project**.
-   - Klik **Add Python project**.
-   - Pilih versi Python yang sudah Anda install.
-   - **Framework:** Pilih `gunicorn`.
-   - **Startup file/directory:** Masukkan `main.py`.
-   - Klik **Confirm**. Ini akan membuat virtual environment untuk Anda.
+### 📖 **Dashboard Usage Guide**
+
+-   **Upload Content:** Click the "Upload Konten" (Upload Content) button. Fill out the form, select a video/image file, write a caption, and click "Upload".
+-   **Post Immediately:** In the "Konten Terbaru" (Recent Content) list, click the "share" icon (arrow) to publish the content directly to Instagram.
+-   **Schedule a Post:** Set a schedule when uploading or create a daily schedule from the "Jadwal Harian" (Daily Schedule) menu.
+
+<details>
+<summary><b>aaPanel Deployment Guide (Click to expand)</b></summary>
+
+Here is a step-by-step guide to deploy this application on your server using aaPanel.
+
+**1. Preparation in aaPanel:**
+   - Open your aaPanel.
+   - Go to the **Website** menu -> **Add site**.
+   - Create a new website for your domain or subdomain.
+
+**2. Upload Code:**
+   - Go to the **Files** menu.
+   - Navigate to the root directory of the website you just created (e.g., `/www/wwwroot/domain.com`).
+   - Delete default files like `index.html`.
+   - Upload all files from this repository to that directory.
+
+**3. Setup Python Environment:**
+   - Go to the **App Store** menu and install **Python Manager**.
+   - Inside Python Manager, install a suitable Python version (e.g., 3.10 or 3.11).
+   - Go back to your **Website** settings, select your site, and click on **Python Project**.
+   - Click **Add Python project**.
+   - Select the Python version you installed.
+   - **Framework:** Choose `gunicorn`.
+   - **Startup file/directory:** Enter `main.py`.
+   - Click **Confirm**. This will create a virtual environment for you.
 
 **4. Install Dependencies:**
-   - Setelah proyek Python dibuat, aaPanel akan memberikan path ke virtual environment Anda.
-   - Buka **Terminal** di aaPanel.
-   - Aktifkan virtual environment dengan perintah yang diberikan, contoh: `source /www/wwwroot/domain.com/pyenv/bin/activate`.
-   - Jalankan perintah berikut untuk menginstal semua library yang diperlukan:
+   - After the Python project is created, aaPanel will provide the path to your virtual environment.
+   - Open the **Terminal** in aaPanel.
+   - Activate the virtual environment with the provided command, e.g., `source /www/wwwroot/domain.com/pyenv/bin/activate`.
+   - Run the following command to install all required libraries:
      ```bash
      pip install -r requirements.txt
      ```
 
-**5. Konfigurasi `.env`:**
-   - Di menu **Files**, masih di dalam direktori proyek Anda, salin `.env.example` menjadi file baru bernama `.env`.
-   - Edit file `.env` tersebut:
-     ```env
-     # Gunakan SQLite untuk kemudahan
-     DATABASE_URL=sqlite:///./daily_content.db
+**5. Configuration and Initial Setup:**
+   - Still in the **Terminal** (with the virtual environment active):
+     - Create the `.env` file: `cp .env.example .env`
+     - Edit the `.env` file with nano: `nano .env`. Enter your Instagram credentials, then save (Ctrl+X, Y, Enter).
+     - Run the interactive setup for the first-time login:
+       ```bash
+       python3 setup.py
+       ```
+     - Follow the prompt to enter the 2FA code from your email.
 
-     # Masukkan kredensial Instagram Anda
-     INSTAGRAM_USERNAME=username_ig_anda
-     INSTAGRAM_PASSWORD=password_ig_anda
+**6. Run the Application:**
+   - Go back to the **Website** settings -> **Python Project**.
+   - Click **Start** or **Restart** to launch your application using Gunicorn.
+   - Your application should now be running and accessible via your domain.
 
-     # Atur port jika diperlukan (default 2009)
-     PORT=2009
-     ```
-
-**6. Inisialisasi Database & Akun:**
-   - Di **Terminal** (dengan virtual environment yang masih aktif), jalankan skrip setup:
-     ```bash
-     python setup.py
-     ```
-   - Skrip ini akan membuat tabel database dan menambahkan akun Instagram Anda ke dalamnya.
-
-**7. Jalankan Aplikasi:**
-   - Kembali ke pengaturan **Website** -> **Python Project**.
-   - Klik **Start** atau **Restart** untuk memulai aplikasi Anda menggunakan Gunicorn.
-   - Aplikasi Anda sekarang seharusnya sudah berjalan dan dapat diakses melalui domain Anda.
-   - Jangan lupa untuk melakukan **proses login pertama kali** seperti yang dijelaskan di atas dengan menjalankan aplikasi secara manual di terminal untuk memasukkan kode 2FA.
+</details>
 
 ---
 
 ## 🆘 **Troubleshooting**
 
-*   **Error `Address already in use`:** Pastikan tidak ada proses lain yang menggunakan port yang sama. Anda bisa mengganti `PORT` di file `.env` Anda ke nomor lain (misalnya, 8008).
-*   **Login Gagal Terus-menerus:** Hapus file `session.json` dan coba lagi proses login pertama kali. Pastikan kredensial di `.env` sudah benar.
-*   **File Tidak Terupload:** Periksa izin folder `uploads/`. Pastikan user yang menjalankan aplikasi memiliki izin tulis (`chmod 755 uploads`).
+*   **Error `Address already in use`:** Make sure no other process is using the same port. You can change the `PORT` in your `.env` file to another number (e.g., 8008).
+*   **Persistent Login Failures:** Delete the `session.json` file and re-run `python3 setup.py` to perform the interactive login process again.
+*   **File Not Uploading:** Check the permissions of the `uploads/` folder. Ensure the user running the application has write permissions (`chmod 755 uploads`).
 
 ---
 

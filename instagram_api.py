@@ -42,10 +42,9 @@ def upload_video_with_instagrapi(file_path: str, caption: str) -> bool:
                 cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
                 cl.dump_settings(SESSION_FILE)
         else:
-            logging.info("No session file found. Performing new login...")
-            # This will require a 2FA code the first time.
-            # This script assumes a session.json file has been created by create_session.py
-            logging.error("session.json not found. Please run create_session.py first.")
+            logging.error("<<<<< LOGIN SESSION NOT FOUND! >>>>>")
+            logging.error("File 'session.json' tidak ditemukan.")
+            logging.error("Jalankan 'python3 setup.py' terlebih dahulu untuk melakukan login pertama kali.")
             return False
 
         # --- Video Upload ---
