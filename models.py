@@ -32,6 +32,11 @@ class Schedule(Base):
     status = Column(String(50), default="pending")  # pending, completed, failed
     error_message = Column(Text)
     retry_count = Column(Integer, default=0)
+
+    # For daily counter feature
+    use_day_counter = Column(Boolean, default=False)
+    day_counter = Column(Integer, default=1)
+
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     

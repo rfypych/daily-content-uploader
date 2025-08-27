@@ -354,8 +354,10 @@ async def create_daily_schedule(
         if not content:
             raise HTTPException(status_code=404, detail="Content not found")
         
+        use_day_counter = request.get("use_day_counter", False)
+
         # Add daily schedule
-        await scheduler.add_daily_schedule(content_id, platform, hour, minute)
+        await scheduler.add_daily_schedule(content_id, platform, hour, minute, use_day_counter)
         
         return {"message": "Daily schedule created successfully"}
         
