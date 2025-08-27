@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List
 from dotenv import load_dotenv
 from instagrapi import Client
-from instagrapi.types import StoryText
 from instagrapi.exceptions import LoginRequired
 from pydantic import ValidationError
 
@@ -107,23 +106,16 @@ def upload_album(paths: List[str], caption: str) -> bool:
         logging.error(f"Failed to upload album: {e}")
         return False
 
-def upload_story(path: str, file_type: str, caption: str) -> bool:
-    """Uploads a photo/video as a Story, with an optional caption as a text sticker."""
+def upload_story(path: str, file_type: str) -> bool:
+    """Uploads a photo/video as a Story."""
     cl = _get_instagrapi_client()
     if not cl: return False
-
-    # Create a text sticker if caption is provided
-    stickers = []
-    if caption:
-        logging.info(f"Adding caption as a text sticker: '{caption[:50]}...'")
-        stickers.append(StoryText(text=caption))
-
     try:
-        logging.info(f"Uploading story from {path}...")
+        logging.info(f"Uploading story from {path} (caption is ignored for stories)...")
         if "image" in file_type:
-            cl.photo_upload_to_story(path, extra_data={'stickers': [s.dict() for s in stickers]})
+            cl.photo_upload_to_story(path)
         elif "video" in file_type:
-            cl.video_upload_to_story(path, extra_data={'stickers': [s.dict() for s in stickers]})
+            cl.video_upload_to_story(path)
         else:
             logging.error(f"Unsupported file type for story: {file_type}")
             return False
