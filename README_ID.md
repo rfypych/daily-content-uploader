@@ -69,21 +69,35 @@ Langkah ini bertujuan untuk menyiapkan konfigurasi, database, dan yang terpentin
 
 Setelah `setup.py` selesai dan `session.json` berhasil dibuat, Anda siap untuk langkah berikutnya.
 
-### **Langkah 2: Menjalankan Server Aplikasi Utama**
+### **Langkah 2: Menjalankan Aplikasi**
 
-Setelah setup awal selesai, Anda dapat menjalankan server web utama kapan saja.
+Aplikasi ini terdiri dari dua komponen utama yang harus dijalankan secara terpisah di lingkungan production: **Server Web** dan **Penjadwal (Scheduler)**.
 
--   **Untuk Development:**
+-   **Server Web:** Menangani antarmuka pengguna (dasbor) dan permintaan API.
+-   **Penjadwal:** Berjalan di latar belakang untuk memproses unggahan yang dijadwalkan.
+
+**Untuk Development:**
+Anda bisa menjalankan kedua proses di dua terminal yang terpisah.
+-   **Terminal 1 (Server Web):**
     ```bash
     python3 main.py
     ```
--   **Untuk Production:** Disarankan menggunakan Gunicorn.
+-   **Terminal 2 (Penjadwal):**
+    ```bash
+    python3 run_scheduler.py
+    ```
+
+**Untuk Production:**
+Sangat penting untuk menjalankan keduanya sebagai service yang berjalan terus-menerus menggunakan process manager seperti `pm2` atau `supervisor`.
+-   **Proses 1 (Server Web dengan Gunicorn):**
     ```bash
     gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
     ```
-    (Ganti `2009` dengan port yang Anda atur di `.env` jika berbeda).
-
-Sekarang Anda dapat mengakses dasbor web di `http://alamat_server_anda:PORT` untuk mulai mengunggah dan menjadwalkan konten.
+-   **Proses 2 (Penjadwal):**
+    ```bash
+    python3 run_scheduler.py
+    ```
+Sekarang Anda dapat mengakses dasbor web di `http://alamat_server_anda:PORT` untuk mulai mengunggah dan menjadwalkan konten. Penjadwal akan secara otomatis mengambil tugas dari database.
 
 ---
 
@@ -139,9 +153,17 @@ Berikut adalah panduan langkah demi langkah untuk mendeploy aplikasi ini di serv
      - Ikuti prompt untuk memasukkan kode 2FA dari email Anda.
 
 **6. Jalankan Aplikasi:**
-   - Kembali ke pengaturan **Website** -> **Python Project**.
-   - Klik **Start** atau **Restart** untuk memulai aplikasi Anda menggunakan Gunicorn.
-   - Aplikasi Anda sekarang seharusnya sudah berjalan dan dapat diakses melalui domain Anda.
+   - Di manajer **Python Project** aaPanel untuk situs Anda, konfigurasikan perintah startup menjadi perintah Gunicorn:
+     ```
+     gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
+     ```
+   - Klik **Start** atau **Restart**. Ini akan menjalankan server web.
+   - Sekarang, buka lagi **Terminal** (pastikan virtual environment aktif: `source .../bin/activate`).
+   - Jalankan penjadwal sebagai proses latar belakang yang persisten. Cara terbaik adalah menggunakan process manager seperti `pm2` atau `supervisor`. Jika tidak ada, Anda bisa menggunakan `nohup` untuk setup sederhana:
+     ```bash
+     nohup python3 run_scheduler.py &
+     ```
+   - Aplikasi Anda sekarang berjalan sepenuhnya.
 
 </details>
 
