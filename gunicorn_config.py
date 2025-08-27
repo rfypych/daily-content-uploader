@@ -4,6 +4,10 @@ Gunicorn configuration for production deployment
 """
 import os
 import multiprocessing
+from dotenv import load_dotenv
+
+# Load .env file before accessing environment variables
+load_dotenv()
 
 # Server socket
 bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"
