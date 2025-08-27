@@ -152,6 +152,10 @@ Berikut adalah panduan langkah demi langkah untuk mendeploy aplikasi ini di serv
 *   **Error `Address already in use`:** Pastikan tidak ada proses lain yang menggunakan port yang sama. Anda bisa mengganti `PORT` di file `.env` Anda ke nomor lain (misalnya, 8008).
 *   **Login Gagal Terus-menerus:** Hapus file `session.json` dan jalankan ulang `python3 setup.py` untuk melakukan proses login interaktif lagi.
 *   **File Tidak Terupload:** Periksa izin folder `uploads/`. Pastikan user yang menjalankan aplikasi memiliki izin tulis (`chmod 755 uploads`).
+*   **Error Database (Contoh: "Unknown column"):** Ini bisa terjadi jika Anda memperbarui kode aplikasi setelah database sudah dibuat. Untuk memperbaikinya, Anda perlu me-reset database Anda. Jalankan skrip setup dengan flag `--reset-db`. **Peringatan: Ini akan menghapus semua konten dan jadwal Anda yang ada.**
+    ```bash
+    python3 setup.py --reset-db
+    ```
 
 ---
 

@@ -23,9 +23,14 @@
                         <i class="fab fa-instagram text-purple-600 mr-2"></i>
                         Instagram Uploader
                     </h1>
-                    <button onclick="openUploadModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition shadow-md">
-                        <i class="fas fa-plus mr-2"></i>Upload Baru
-                    </button>
+                    <div class="flex items-center space-x-4">
+                        <button onclick="openScheduleModal()" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition shadow-md">
+                            <i class="fas fa-calendar-alt mr-2"></i>Jadwal Harian
+                        </button>
+                        <button onclick="openUploadModal()" class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition shadow-md">
+                            <i class="fas fa-plus mr-2"></i>Upload Baru
+                        </button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -267,6 +272,100 @@
                 } else {
                     const error = await response.json();
                     alert('Gagal hapus konten: ' + (error.detail || 'Error tidak diketahui'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // --- Daily Schedule Modal Logic ---
+        function openScheduleModal() {
+            const modalHTML = `
+                <div id="scheduleModal" class="fixed inset-0 bg-gray-900 bg-opacity-60 flex items-center justify-center z-50">
+                    <div class="bg-white rounded-lg p-8 w-full max-w-md mx-4 shadow-xl transform transition-all">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-xl font-semibold">Buat Jadwal Harian</h3>
+                            <button onclick="closeScheduleModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times fa-lg"></i></button>
+                        </div>
+                        <form id="scheduleForm">
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="scheduleContent" class="block text-sm font-medium text-gray-700 mb-1">Pilih Konten</label>
+                                    <select id="scheduleContent" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500">
+                                        <option value="">Memuat konten...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="scheduleTime" class="block text-sm font-medium text-gray-700 mb-1">Waktu Posting (Setiap Hari)</label>
+                                    <input type="time" id="scheduleTime" required class="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" value="09:00">
+                                </div>
+                            </div>
+                            <div class="flex justify-end space-x-4 mt-8">
+                                <button type="button" onclick="closeScheduleModal()" class="px-5 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">Batal</button>
+                                <button type="submit" class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 shadow-md">Jadwalkan</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            loadContentOptions();
+
+            document.getElementById('scheduleForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                createDailySchedule();
+            });
+        }
+
+        function closeScheduleModal() {
+            const modal = document.getElementById('scheduleModal');
+            if (modal) modal.remove();
+        }
+
+        async function loadContentOptions() {
+            try {
+                const response = await fetch('/api/contents');
+                const data = await response.json();
+                const select = document.getElementById('scheduleContent');
+                select.innerHTML = '<option value="">Pilih konten untuk dijadwalkan...</option>';
+                data.contents.forEach(content => {
+                    const option = document.createElement('option');
+                    option.value = content.id;
+                    option.textContent = `${content.id}: ${content.filename}`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading content options:', error);
+                alert('Gagal memuat daftar konten.');
+            }
+        }
+
+        async function createDailySchedule() {
+            const contentId = document.getElementById('scheduleContent').value;
+            const time = document.getElementById('scheduleTime').value;
+
+            if (!contentId) {
+                alert('Pilih konten terlebih dahulu.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/schedule/daily', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        content_id: parseInt(contentId),
+                        platform: "instagram", // Hardcoded to instagram
+                        time: time
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Jadwal harian berhasil dibuat!');
+                    closeScheduleModal();
+                } else {
+                    const error = await response.json();
+                    alert('Gagal membuat jadwal: ' + (error.detail || 'Error tidak diketahui'));
                 }
             } catch (error) {
                 alert('Error: ' + error.message);

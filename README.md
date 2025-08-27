@@ -152,6 +152,10 @@ Here is a step-by-step guide to deploy this application on your server using aaP
 *   **Error `Address already in use`:** Make sure no other process is using the same port. You can change the `PORT` in your `.env` file to another number (e.g., 8008).
 *   **Persistent Login Failures:** Delete the `session.json` file and re-run `python3 setup.py` to perform the interactive login process again.
 *   **File Not Uploading:** Check the permissions of the `uploads/` folder. Ensure the user running the application has write permissions (`chmod 755 uploads`).
+*   **Database Error (e.g., "Unknown column"):** This can happen if you update the application code after the database has already been created. To fix this, you need to reset your database. Run the setup script with the `--reset-db` flag. **Warning: This will delete all your existing content and schedules.**
+    ```bash
+    python3 setup.py --reset-db
+    ```
 
 ---
 
