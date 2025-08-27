@@ -50,8 +50,8 @@ class ContentUploader:
                 # Album expects a list of paths
                 args = [content.file_path.split(','), content.caption]
             elif post_type == "story":
-                # Story needs a path and the file_type to distinguish photo from video
-                args = [content.file_path, content.file_type]
+                # Story needs a path, file_type, and the caption for the text sticker
+                args = [content.file_path, content.file_type, content.caption]
             else:
                 # Others need path and caption
                 args = [content.file_path, content.caption]
