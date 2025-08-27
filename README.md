@@ -70,10 +70,10 @@ This application requires two separate processes to be running simultaneously in
 
 ### Terminal 1: Run the Web Server
 
-The web server handles the user interface and API requests. We use Gunicorn for production.
+The web server handles the user interface and API requests. We use Gunicorn with a Uvicorn worker to run our FastAPI application.
 
 ```bash
-gunicorn --bind 0.0.0.0:8000 wsgi:app
+gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 main:app
 ```
 
 You can now access the web dashboard by navigating to `http://localhost:8000` in your web browser.
