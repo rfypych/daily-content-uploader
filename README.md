@@ -69,21 +69,35 @@ This step prepares the configuration, database, and most importantly, performs t
 
 Once `setup.py` is complete and `session.json` has been successfully created, you are ready for the next step.
 
-### **Step 2: Running the Main Application Server**
+### **Step 2: Running the Application**
 
-After the initial setup is done, you can run the main web server at any time.
+The application consists of two main components that must be run separately in production: the **Web Server** and the **Scheduler**.
 
--   **For Development:**
+-   **Web Server:** Handles the user interface and API requests.
+-   **Scheduler:** Runs in the background to process scheduled uploads.
+
+**For Development:**
+You can run both processes in two separate terminal windows.
+-   **Terminal 1 (Web Server):**
     ```bash
     python3 main.py
     ```
--   **For Production:** It is recommended to use Gunicorn.
+-   **Terminal 2 (Scheduler):**
+    ```bash
+    python3 run_scheduler.py
+    ```
+
+**For Production:**
+It is crucial to run both as persistent background services using a process manager like `pm2` or `supervisor`.
+-   **Process 1 (Web Server with Gunicorn):**
     ```bash
     gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
     ```
-    (Replace `2009` with the port you set in your `.env` if you changed it).
-
-You can now access the web dashboard at `http://your_server_address:PORT` to start uploading and scheduling content.
+-   **Process 2 (Scheduler):**
+    ```bash
+    python3 run_scheduler.py
+    ```
+You can now access the web dashboard at `http://your_server_address:PORT` to start uploading and scheduling content. The scheduler will automatically pick up jobs from the database.
 
 ---
 
@@ -139,9 +153,17 @@ Here is a step-by-step guide to deploy this application on your server using aaP
      - Follow the prompt to enter the 2FA code from your email.
 
 **6. Run the Application:**
-   - Go back to the **Website** settings -> **Python Project**.
-   - Click **Start** or **Restart** to launch your application using Gunicorn.
-   - Your application should now be running and accessible via your domain.
+   - In the aaPanel **Python Project** manager for your site, configure the startup command to be the Gunicorn command:
+     ```
+     gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
+     ```
+   - Click **Start** or **Restart**. This runs the web server.
+   - Now, open the **Terminal** again (ensure the virtual environment is active: `source .../bin/activate`).
+   - Run the scheduler as a persistent background process. The best way is using a process manager like `pm2` or `supervisor`. If you don't have one, you can use `nohup` for a simple setup:
+     ```bash
+     nohup python3 run_scheduler.py &
+     ```
+   - Your application is now fully running.
 
 </details>
 

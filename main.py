@@ -34,23 +34,15 @@ uploader = ContentUploader()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler for startup and shutdown"""
-    # Startup
-    logger.info("Starting Daily Content Uploader...")
+    """Lifespan event handler for startup and shutdown."""
+    # On startup, we just log that the web server is starting.
+    # The scheduler is now run in a separate process via run_scheduler.py
+    logger.info("Starting Daily Content Uploader Web Server...")
     logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
     logger.info(f"Database URL: {os.getenv('DATABASE_URL', 'Not configured')}")
-    
-    # Start scheduler
-    await scheduler.start()
-    logger.info("Content scheduler started")
-    
     yield
-    
-    # Shutdown
-    logger.info("Shutting down Daily Content Uploader...")
-    await uploader.close_browser()
-    await scheduler.stop()
-    logger.info("Content scheduler stopped")
+    # On shutdown
+    logger.info("Shutting down Daily Content Uploader Web Server...")
 
 # FastAPI app with lifespan
 app = FastAPI(
