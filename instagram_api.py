@@ -18,96 +18,140 @@ SESSION_FILE = Path("session.json")
 # --- Helper Function ---
 
 def _get_instagrapi_client() -> Client:
-    """Handles client instantiation and session login."""
+    """
+    Handles client instantiation, session loading, and login.
+    Returns a logged-in client instance or None on failure.
+    """
     if not all([INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD]):
         logging.error("Missing Instagram credentials in .env file.")
         return None
+
     cl = Client()
+
     if not SESSION_FILE.exists():
         logging.error("session.json not found. Please run 'python3 setup.py' first.")
         return None
+
     try:
         logging.info(f"Loading session from {SESSION_FILE}...")
         cl.load_settings(SESSION_FILE)
         cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
-        cl.get_timeline_feed()
-        logging.info("Session is valid.")
+        # It's good practice to make a lightweight API call to check if the session is valid.
+        cl.get_timeline_feed(amount=1)
+        logging.info("Session is valid and login successful.")
         return cl
     except LoginRequired:
-        logging.error("Session is invalid. Please run 'python3 setup.py' again.")
+        logging.error("Session is invalid. Please run 'python3 setup.py' again to refresh it.")
         return None
     except Exception as e:
-        logging.error(f"An unexpected error occurred during client login: {e}")
+        logging.error(f"An unexpected error occurred during client login: {e}", exc_info=True)
         return None
 
 # --- Upload Functions ---
 
-def _upload_and_edit_caption(upload_func, caption, *args, **kwargs):
-    """Helper to perform an upload and then immediately edit the caption as a workaround."""
+def upload_photo(path: str, caption: str) -> bool:
+    """
+    Uploads a single photo.
+    Uses the 'upload then edit caption' method for maximum reliability.
+    """
+    logging.info(f"Attempting to upload photo from {path}...")
+    cl = _get_instagrapi_client()
+    if not cl:
+        return False
+
     try:
-        media = upload_func(*args, **kwargs)
+        media = cl.photo_upload(path=path, caption="") # Upload with empty caption first
         if caption:
-            logging.info(f"Caption workaround: Editing media {media.pk} to set caption.")
+            logging.info(f"Editing media {media.pk} to set caption.")
             cl.media_edit(media.pk, caption)
-        logging.info(f"Upload and caption set for media {media.pk} successfully.")
-        return True
-    except ValidationError:
-        logging.warning("Caught Pydantic error, but assuming upload was successful.")
+        logging.info(f"Successfully uploaded photo {media.pk}.")
         return True
     except Exception as e:
-        logging.error(f"Failed during upload/caption edit process: {e}")
+        logging.error(f"Failed to upload photo: {e}", exc_info=True)
         return False
-
-def upload_photo(path: str, caption: str) -> bool:
-    """Uploads a single photo to the Instagram feed."""
-    cl = _get_instagrapi_client()
-    if not cl: return False
-    logging.info(f"Uploading photo from {path} with caption: '{caption[:50]}...'")
-    return _upload_and_edit_caption(cl.photo_upload, caption, path=path, caption="")
 
 def upload_video(path: str, caption: str) -> bool:
-    """Uploads a single video to the Instagram feed."""
+    """
+    Uploads a single video.
+    Uses the 'upload then edit caption' method for maximum reliability.
+    """
+    logging.info(f"Attempting to upload video from {path}...")
     cl = _get_instagrapi_client()
-    if not cl: return False
-    logging.info(f"Uploading video from {path} with caption: '{caption[:50]}...'")
-    return _upload_and_edit_caption(cl.video_upload, caption, path=path, caption="")
+    if not cl:
+        return False
+
+    try:
+        media = cl.video_upload(path=path, caption="") # Upload with empty caption first
+        if caption:
+            logging.info(f"Editing media {media.pk} to set caption.")
+            cl.media_edit(media.pk, caption)
+        logging.info(f"Successfully uploaded video {media.pk}.")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to upload video: {e}", exc_info=True)
+        return False
 
 def upload_reel(path: str, caption: str) -> bool:
-    """Uploads a video as a Reel."""
+    """
+    Uploads a video as a Reel.
+    The `clip_upload` method is generally reliable with captions directly.
+    """
+    logging.info(f"Attempting to upload Reel from {path}...")
     cl = _get_instagrapi_client()
-    if not cl: return False
-    logging.info(f"Uploading Reel from {path} with caption: '{caption[:50]}...'")
-    return _upload_and_edit_caption(cl.clip_upload, caption, path=path, caption=caption) # Reels can take caption directly
+    if not cl:
+        return False
+
+    try:
+        media = cl.clip_upload(path=path, caption=caption)
+        logging.info(f"Successfully uploaded Reel {media.pk}.")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to upload Reel: {e}", exc_info=True)
+        return False
 
 def upload_album(paths: List[str], caption: str) -> bool:
-    """Uploads multiple photos/videos as a carousel/album."""
+    """
+    Uploads multiple photos/videos as a carousel/album.
+    The `album_upload` method is generally reliable with captions directly.
+    """
+    logging.info(f"Attempting to upload album with {len(paths)} media...")
     cl = _get_instagrapi_client()
-    if not cl: return False
+    if not cl:
+        return False
+
+    # Validate that all paths exist before attempting upload
     validated_paths = [p for p in paths if Path(p).is_file()]
     if len(validated_paths) != len(paths):
-        logging.error("One or more files not found in album paths.")
+        logging.error("One or more files not found in album paths. Aborting upload.")
         return False
-    logging.info(f"Uploading album with {len(paths)} media and caption: '{caption[:50]}...'")
-    return _upload_and_edit_caption(cl.album_upload, caption, paths=validated_paths, caption=caption)
+
+    try:
+        media = cl.album_upload(paths=validated_paths, caption=caption)
+        logging.info(f"Successfully uploaded album {media.pk}.")
+        return True
+    except Exception as e:
+        logging.error(f"Failed to upload album: {e}", exc_info=True)
+        return False
 
 def upload_story(path: str, file_type: str) -> bool:
-    """Uploads a photo/video as a Story."""
+    """
+    Uploads a photo or video as a Story. Captions are not supported here.
+    """
+    logging.info(f"Attempting to upload story from {path}...")
     cl = _get_instagrapi_client()
-    if not cl: return False
+    if not cl:
+        return False
+
     try:
-        logging.info(f"Uploading story from {path} (caption is ignored)...")
         if "image" in file_type:
-            cl.photo_upload_to_story(path)
+            media = cl.photo_upload_to_story(path=path)
         elif "video" in file_type:
-            cl.video_upload_to_story(path)
+            media = cl.video_upload_to_story(path=path)
         else:
             logging.error(f"Unsupported file type for story: {file_type}")
             return False
-        logging.info("Story uploaded successfully.")
-        return True
-    except ValidationError:
-        logging.warning("Caught Pydantic error, but assuming story upload was successful.")
+        logging.info(f"Successfully uploaded story {media.pk}.")
         return True
     except Exception as e:
-        logging.error(f"Failed to upload story: {e}")
+        logging.error(f"Failed to upload story: {e}", exc_info=True)
         return False
