@@ -142,14 +142,15 @@ class ContentScheduler:
             db.commit()
 
             job_id = f"daily_{new_recurring_schedule.id}"
+            user_timezone = os.getenv('TIMEZONE', 'UTC')
             self.scheduler.add_job(
                 func=execute_recurring_job,
-                trigger=CronTrigger(hour=hour, minute=minute, timezone='UTC'),
+                trigger=CronTrigger(hour=hour, minute=minute, timezone=user_timezone),
                 args=[new_recurring_schedule.id], # Pass the ID of the recurring schedule
                 id=job_id,
                 replace_existing=True
             )
-            logger.info(f"Added daily recurring job '{job_id}' for content {content_id} at {hour:02d}:{minute:02d} UTC.")
+            logger.info(f"Added daily recurring job '{job_id}' for content {content_id} at {hour:02d}:{minute:02d} in timezone {user_timezone}.")
         finally:
             db.close()
 
