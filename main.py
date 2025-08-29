@@ -359,6 +359,54 @@ async def create_daily_schedule(
         logger.error(f"Error creating daily schedule: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+@app.post("/schedule/once")
+async def create_one_time_schedule(
+    request: dict,
+    db: Session = Depends(get_db)
+):
+    """Create a one-time, specific-date schedule for a piece of content."""
+    try:
+        content_id = request.get("content_id")
+        platform = request.get("platform")
+        time_str = request.get("scheduled_time") # Expecting ISO 8601 format: "YYYY-MM-DDTHH:MM:SS"
+
+        if not all([content_id, platform, time_str]):
+            raise HTTPException(status_code=400, detail="Missing required fields")
+
+        # Parse time
+        try:
+            scheduled_time = datetime.fromisoformat(time_str)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid time format. Use ISO 8601.")
+
+        # Check if content exists
+        content = db.query(Content).filter(Content.id == content_id).first()
+        if not content:
+            raise HTTPException(status_code=404, detail="Content not found")
+
+        # Create the schedule entry in our database
+        new_schedule = Schedule(
+            content_id=content_id,
+            platform=platform,
+            scheduled_time=scheduled_time,
+            status="pending"
+        )
+        db.add(new_schedule)
+        db.commit()
+        db.refresh(new_schedule)
+
+        # Add the job to the APScheduler instance
+        await scheduler.schedule_upload(new_schedule)
+
+        logger.info(f"Successfully scheduled content {content_id} for one-time upload at {scheduled_time}")
+        return {"message": "Content scheduled for one-time upload successfully."}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating one-time schedule: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 2009))
     host = os.getenv("HOST", "0.0.0.0")

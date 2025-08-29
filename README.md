@@ -70,13 +70,13 @@ This application requires two separate processes to be running simultaneously in
 
 ### Terminal 1: Run the Web Server
 
-The web server handles the user interface and API requests. We use Gunicorn with a Uvicorn worker to run our FastAPI application.
+The web server handles the user interface and API requests. We use Gunicorn, and its settings are controlled by the `gunicorn_config.py` file. This allows for flexible configuration (like setting the port) via the `.env` file.
 
 ```bash
-gunicorn -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 main:app
+gunicorn -c gunicorn_config.py main:app
 ```
 
-You can now access the web dashboard by navigating to `http://localhost:8000` in your web browser.
+You can now access the web dashboard by navigating to `http://localhost:2010` (or whichever port you have set in your `.env` file) in your web browser.
 
 ### Terminal 2: Run the Scheduler
 
