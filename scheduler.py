@@ -79,7 +79,7 @@ async def execute_recurring_job(recurring_schedule_id: int):
         if master_schedule.use_day_counter:
             day = master_schedule.day_counter
             original_caption = content_to_upload.caption or ""
-            content_for_this_run.caption = f"Day {day} - {original_caption}"
+            content_for_this_run.caption = f"Day {day} {original_caption}"
             logger.info(f"Applying dynamic caption: '{content_for_this_run.caption}'")
 
         uploader = ContentUploader()

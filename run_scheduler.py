@@ -1,86 +1,102 @@
 import asyncio
 import logging
+import os
 from dotenv import load_dotenv
+from datetime import datetime, timezone
 
 # Load environment variables first
 load_dotenv()
 
-from scheduler import scheduler
+from scheduler import scheduler, execute_scheduled_upload, execute_recurring_job
+from database import SessionLocal
+from models import Schedule
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(asctime)s - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-from database import SessionLocal
-from models import Schedule
-from datetime import datetime, timezone
-
-async def load_and_reschedule_jobs():
+async def discover_and_schedule_jobs():
     """
-    Loads all 'pending' and 'recurring' jobs from the database and
-    adds them to the APScheduler instance. This is crucial for ensuring
-    that jobs persist across scheduler restarts.
+    Periodically discovers new schedule 'intents' from the database
+    and adds them to the live APScheduler.
     """
     db = SessionLocal()
     try:
-        logger.info("--- Loading and rescheduling existing jobs from database ---")
+        logger.info("Checking for new jobs to schedule...")
 
-        # Load one-time pending jobs
-        pending_schedules = db.query(Schedule).filter(
-            Schedule.status == 'pending',
-            Schedule.scheduled_time > datetime.now(timezone.utc) # Only schedule future jobs
-        ).all()
+        # Find all schedule intents that haven't been processed yet
+        new_schedules = db.query(Schedule).filter(Schedule.is_scheduled == False).all()
 
-        logger.info(f"Found {len(pending_schedules)} pending one-time jobs to reschedule.")
-        for schedule in pending_schedules:
-            logger.info(f"Rescheduling job for content {schedule.content_id} at {schedule.scheduled_time}")
-            await scheduler.schedule_upload(schedule)
+        if not new_schedules:
+            logger.info("No new jobs found.")
+            return
 
-        # Load recurring jobs
-        recurring_schedules = db.query(Schedule).filter(Schedule.status == 'recurring').all()
-        logger.info(f"Found {len(recurring_schedules)} recurring jobs to reschedule.")
-        for r_schedule in recurring_schedules:
-            # We need to extract the time from the original job's cron trigger
-            # This is a bit tricky as the time isn't stored directly on the Schedule model.
-            # A better approach would be to store hour/minute on the recurring schedule model.
-            # For now, we assume the job already exists in the job store and scheduler.start() will handle it.
-            # The add_daily_schedule creates a master schedule entry AND adds to APScheduler.
-            # When the scheduler starts, it should pick up jobs from its own table.
-            # The main fix is for the 'pending' jobs which are not master jobs.
-            pass # Let's see if scheduler.start() handles the recurring ones from the jobstore.
-            # The original logic for daily schedule in main.py already adds to the scheduler job store.
-            # The main gap was for one-time schedules.
+        logger.info(f"Found {len(new_schedules)} new jobs to add to the scheduler.")
 
-        logger.info("--- Finished loading jobs ---")
+        for schedule in new_schedules:
+            job_id = None
+            try:
+                if schedule.status == 'pending':
+                    # This is a one-time job
+                    job_id = f"upload_{schedule.id}"
+                    scheduler.scheduler.add_job(
+                        func=execute_scheduled_upload,
+                        trigger='date',
+                        run_date=schedule.scheduled_time,
+                        args=[schedule.id],
+                        id=job_id,
+                        replace_existing=True
+                    )
+                    logger.info(f"Scheduled one-time job '{job_id}' for {schedule.scheduled_time}.")
 
-    except Exception as e:
-        logger.error(f"Error during job rescheduling: {e}", exc_info=True)
+                elif schedule.status == 'recurring':
+                    # This is a recurring (daily) job
+                    job_id = f"daily_{schedule.id}"
+                    user_timezone = os.getenv('TIMEZONE', 'UTC')
+                    scheduler.scheduler.add_job(
+                        func=execute_recurring_job,
+                        trigger='cron',
+                        hour=schedule.hour,
+                        minute=schedule.minute,
+                        timezone=user_timezone,
+                        args=[schedule.id],
+                        id=job_id,
+                        replace_existing=True
+                    )
+                    logger.info(f"Scheduled recurring job '{job_id}' for {schedule.hour:02d}:{schedule.minute:02d} ({user_timezone}).")
+
+                # If scheduling was successful, mark it as processed
+                schedule.is_scheduled = True
+                db.commit()
+                logger.info(f"Successfully processed and marked schedule {schedule.id}.")
+
+            except Exception as e:
+                logger.error(f"Failed to schedule job for schedule_id {schedule.id}: {e}", exc_info=True)
+                # We don't commit here, so it can be picked up on the next run
+
     finally:
         db.close()
 
-
 async def main():
     """
-    Main function to start and run the scheduler indefinitely.
-    This should be run as a separate, persistent process in production.
+    Main function to start the scheduler and run the discovery loop.
     """
-    logger.info("Initializing scheduler...")
+    logger.info("--- Starting Scheduler Service ---")
 
-    # First, load any jobs from our application's database schema
-    await load_and_reschedule_jobs()
+    # Start the underlying APScheduler engine. It will run in the background.
+    await scheduler.start()
 
-    logger.info("Starting the standalone scheduler process...")
     try:
-        # Now, start the APScheduler engine. It will load jobs from its own job store.
-        await scheduler.start()
-        logger.info("Scheduler started successfully. Process will now run in the background.")
-        # Keep the process alive
+        # This is the main service loop
         while True:
-            await asyncio.sleep(3600)  # Sleep for an hour, the scheduler runs on its own thread.
+            await discover_and_schedule_jobs()
+            logger.info("Scheduler service sleeping for 60 seconds...")
+            await asyncio.sleep(60)
     except (KeyboardInterrupt, SystemExit):
-        logger.info("Scheduler process stopped.")
+        logger.info("Scheduler service shutting down.")
     finally:
         await scheduler.stop()
 
 if __name__ == "__main__":
+    # This check is important for multiprocessing safety
     asyncio.run(main())
