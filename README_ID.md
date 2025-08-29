@@ -6,10 +6,10 @@
 
 ### *Otomasi Posting Instagram yang Simpel dan Powerful*
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-green.svg)](https://fastapi.tiangolo.com)
-[![instagrapi](https://img.shields.io/badge/instagrapi-2.2.1-purple.svg)](https://github.com/subzeroid/instagrapi)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Framework](https://img.shields.io/badge/FastAPI-0.116+-green.svg?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Scheduler](https://img.shields.io/badge/Scheduler-APScheduler-blueviolet.svg?style=for-the-badge)](https://apscheduler.readthedocs.io)
+[![Uploader](https://img.shields.io/badge/Engine-instagrapi-purple.svg?style=for-the-badge)](https://github.com/subzeroid/instagrapi)
 
 **🎯 Set & Forget - Upload dan jadwalkan konten Instagram 24/7 tanpa intervensi manual!**
 
@@ -23,11 +23,11 @@
 
 <div align="center">
 
-| 🎯 **Core Features** | 🔧 **Technical Features** | 🚀 **Advanced Features** |
+| 🎯 **Fitur Inti** | 🔧 **Fitur Teknis** | 🚀 **Fitur Lanjutan** |
 |:---:|:---:|:---:|
-| 📱 **Instagram Automation**<br/>Fokus pada satu platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>APScheduler Integration |
-| 📅 **Auto Scheduling**<br/>Set & Forget | 🗄️ **Database Management**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Login aman & efisien |
-| 🎨 **Web Dashboard**<br/>Modern UI/UX | 🌐 **Production Ready**<br/>Gunicorn + Web Server | 📊 **Analytics & Monitoring**<br/>Real-time Status |
+| 📱 **Otomasi Instagram**<br/>Fokus pada satu platform | 🤖 **Private API**<br/>Mesin instagrapi | ⏰ **Penjadwal Cerdas**<br/>Servis Polling |
+| 📅 **Penjadwalan Otomatis**<br/>Sekali Jalan & Harian | 🗄️ **Database Agnostic**<br/>Dukungan SQLite & MySQL | 🔐 **Manajemen Sesi**<br/>Login aman & efisien |
+| 🎨 **Dasbor Web**<br/>UI/UX Modern | 🌐 **Siap Produksi**<br/>Gunicorn + Uvicorn | 📊 **Manajemen Konten**<br/>Riwayat & Status |
 
 </div>
 
@@ -43,7 +43,7 @@ Langkah ini bertujuan untuk menyiapkan konfigurasi, database, dan yang terpentin
 
 1.  **Clone Repositori:**
     ```bash
-    git clone https://github.com/rfypych/daily-content-uploader.git
+    git clone https://github.com/your-repo/your-project.git
     cd daily-content-uploader
     ```
 
@@ -56,13 +56,13 @@ Langkah ini bertujuan untuk menyiapkan konfigurasi, database, dan yang terpentin
     ```bash
     cp .env.example .env
     ```
-    Buka file `.env` tersebut dan isi kredensial Instagram Anda (`INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD`). Anda juga bisa mengganti `PORT` jika diperlukan.
+    Buka file `.env` tersebut dan isi kredensial Instagram Anda (`INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD`). Anda juga bisa mengganti `PORT` dan `TIMEZONE` jika diperlukan.
 
 4.  **Jalankan Skrip Setup Interaktif:** Jalankan skrip `setup.py` dari terminal Anda.
     ```bash
     python3 setup.py
     ```
-    - Skrip ini akan membuat database (`daily_content.db`).
+    - Skrip ini akan membuat database.
     - Kemudian, ia akan mencoba login ke Instagram.
     - **PENTING:** Instagram akan mengirimkan kode verifikasi (2FA) ke email Anda. Skrip akan berhenti dan meminta Anda memasukkan kode 6 digit tersebut di terminal.
     - Setelah kode dimasukkan dengan benar, skrip akan membuat file `session.json`. File ini adalah kunci Anda untuk login otomatis di masa mendatang.
@@ -71,13 +71,10 @@ Setelah `setup.py` selesai dan `session.json` berhasil dibuat, Anda siap untuk l
 
 ### **Langkah 2: Menjalankan Aplikasi**
 
-Aplikasi ini terdiri dari dua komponen utama yang harus dijalankan secara terpisah di lingkungan production: **Server Web** dan **Penjadwal (Scheduler)**.
+Aplikasi ini terdiri dari dua komponen utama yang harus dijalankan secara terpisah: **Server Web** dan **Servis Penjadwal**.
 
--   **Server Web:** Menangani antarmuka pengguna (dasbor) dan permintaan API.
--   **Penjadwal:** Berjalan di latar belakang untuk memproses unggahan yang dijadwalkan.
-
-**Untuk Development:**
-Anda bisa menjalankan kedua proses di dua terminal yang terpisah.
+#### **Untuk Development**
+Untuk pengetesan lokal, Anda bisa menjalankan kedua proses di dua terminal yang terpisah.
 -   **Terminal 1 (Server Web):**
     ```bash
     python3 main.py
@@ -87,85 +84,30 @@ Anda bisa menjalankan kedua proses di dua terminal yang terpisah.
     python3 run_scheduler.py
     ```
 
-**Untuk Production:**
-Sangat penting untuk menjalankan keduanya sebagai service yang berjalan terus-menerus menggunakan process manager seperti `pm2` atau `supervisor`.
--   **Proses 1 (Server Web dengan Gunicorn):**
+#### **Untuk Produksi**
+Sangat penting untuk menjalankan keduanya sebagai servis latar belakang yang persisten. Menggunakan `nohup` dengan pengalihan log adalah cara yang kuat untuk mencapai ini.
+
+1.  **Jalankan Server Web:**
     ```bash
-    gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
+    nohup gunicorn -c gunicorn_config.py main:app > gunicorn.log 2>&1 &
     ```
--   **Proses 2 (Penjadwal):**
+    Perintah ini memulai server web Gunicorn di latar belakang dan menyimpan semua outputnya ke `gunicorn.log`.
+
+2.  **Jalankan Servis Penjadwal:**
     ```bash
-    python3 run_scheduler.py
+    nohup python3 run_scheduler.py > scheduler.log 2>&1 &
     ```
-Sekarang Anda dapat mengakses dasbor web di `http://alamat_server_anda:PORT` untuk mulai mengunggah dan menjadwalkan konten. Penjadwal akan secara otomatis mengambil tugas dari database.
+    Perintah ini memulai servis penjadwal di latar belakang dan menyimpan semua outputnya ke `scheduler.log`.
+
+Anda sekarang dapat mengakses dasbor web di `http://alamat_server_anda:PORT`. Penjadwal akan berjalan secara independen, memeriksa database untuk pekerjaan baru.
 
 ---
 
 ### 📖 **Panduan Penggunaan Dasbor**
 
--   **Upload Konten:** Klik tombol "Upload Konten". Isi form, pilih file video/gambar, tulis caption, dan klik "Upload".
--   **Posting Langsung:** Di daftar "Konten Terbaru", klik ikon "share" (panah) untuk langsung mempublikasikan konten.
--   **Menjadwalkan Posting:** Atur jadwal saat mengunggah, atau buat jadwal harian dari menu "Jadwal Harian".
-
-<details>
-<summary><b>Panduan Deployment di aaPanel (Klik untuk membuka)</b></summary>
-
-Berikut adalah panduan langkah demi langkah untuk mendeploy aplikasi ini di server Anda menggunakan aaPanel.
-
-**1. Persiapan di aaPanel:**
-   - Buka aaPanel Anda.
-   - Pergi ke menu **Website** -> **Add site**.
-   - Buat website baru untuk domain atau subdomain Anda.
-
-**2. Upload Kode:**
-   - Pergi ke menu **Files**.
-   - Navigasi ke direktori root website yang baru saja Anda buat (misalnya, `/www/wwwroot/domain.com`).
-   - Hapus file default seperti `index.html`.
-   - Upload semua file dari repositori ini ke direktori tersebut.
-
-**3. Setup Lingkungan Python:**
-   - Pergi ke menu **App Store** dan install **Python Manager**.
-   - Di dalam Python Manager, install versi Python yang sesuai (misalnya, 3.10 atau 3.11).
-   - Kembali ke pengaturan **Website** Anda, pilih situs Anda, dan klik **Python Project**.
-   - Klik **Add Python project**.
-   - Pilih versi Python yang sudah Anda install.
-   - **Framework:** Pilih `gunicorn`.
-   - **Startup file/directory:** Masukkan `main.py`.
-   - Klik **Confirm**. Ini akan membuat virtual environment untuk Anda.
-
-**4. Install Dependencies:**
-   - Setelah proyek Python dibuat, aaPanel akan memberikan path ke virtual environment Anda.
-   - Buka **Terminal** di aaPanel.
-   - Aktifkan virtual environment dengan perintah yang diberikan, contoh: `source /www/wwwroot/domain.com/pyenv/bin/activate`.
-   - Jalankan perintah berikut untuk menginstal semua library yang diperlukan:
-     ```bash
-     pip install -r requirements.txt
-     ```
-
-**5. Konfigurasi dan Setup Awal:**
-   - Masih di **Terminal** (dengan virtual environment aktif):
-     - Buat file `.env`: `cp .env.example .env`
-     - Edit file `.env` dengan editor nano: `nano .env`. Masukkan kredensial Instagram Anda, lalu simpan (Ctrl+X, Y, Enter).
-     - Jalankan setup interaktif untuk login pertama kali:
-       ```bash
-       python3 setup.py
-       ```
-     - Ikuti prompt untuk memasukkan kode 2FA dari email Anda.
-
-**6. Jalankan Aplikasi:**
-   - Di manajer **Python Project** aaPanel untuk situs Anda, konfigurasikan perintah startup menjadi perintah Gunicorn:
-     ```
-     gunicorn --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:2009
-     ```
-   - Klik **Start** atau **Restart**. Ini akan menjalankan server web.
-   - Sekarang, buka lagi **Terminal** (pastikan virtual environment aktif: `source .../bin/activate`).
-   - Jalankan penjadwal sebagai proses latar belakang yang persisten. Cara terbaik adalah menggunakan process manager seperti `pm2` atau `supervisor`. Jika tidak ada, Anda bisa menggunakan `nohup` untuk setup sederhana:
-     ```bash
-     nohup python3 run_scheduler.py &
-     ```
-   - Aplikasi Anda sekarang berjalan sepenuhnya.
-
-</details>
+-   **Upload Konten:** Klik tombol "New Upload". Isi form, pilih file video/gambar, tulis caption, dan klik "Upload".
+-   **Posting Langsung:** Di daftar "Content History", klik ikon "share" (panah) untuk langsung mempublikasikan konten.
+-   **Menjadwalkan Posting:** Gunakan tombol "Schedule for a specific time" (ikon kalender) untuk posting sekali jalan, atau buat jadwal berulang dari menu "Daily Schedule".
 
 ---
 
@@ -181,4 +123,4 @@ Berikut adalah panduan langkah demi langkah untuk mendeploy aplikasi ini di serv
 
 ---
 
-**Happy Content Creating! 🎉**
+**Selamat Membuat Konten! 🎉**
