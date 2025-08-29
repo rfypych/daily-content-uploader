@@ -29,13 +29,18 @@ class Schedule(Base):
     content_id = Column(Integer, ForeignKey("contents.id", ondelete="CASCADE"))
     platform = Column(String(50), nullable=False)  # instagram, tiktok
     scheduled_time = Column(DateTime, nullable=False)
-    status = Column(String(50), default="pending")  # pending, completed, failed
+    status = Column(String(50), default="pending")  # pending, completed, failed, recurring
     error_message = Column(Text)
     retry_count = Column(Integer, default=0)
+    is_scheduled = Column(Boolean, default=False, nullable=False) # Has the scheduler service picked up this job?
 
     # For daily counter feature
     use_day_counter = Column(Boolean, default=False)
     day_counter = Column(Integer, default=1)
+
+    # For recurring jobs, to store the time of day
+    hour = Column(Integer)
+    minute = Column(Integer)
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

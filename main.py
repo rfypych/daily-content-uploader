@@ -348,10 +348,23 @@ async def create_daily_schedule(
         
         use_day_counter = request.get("use_day_counter", False)
 
-        # Add daily schedule
-        await scheduler.add_daily_schedule(content_id, platform, hour, minute, use_day_counter)
+        # Create the schedule entry in our database. The scheduler service will pick it up.
+        new_schedule = Schedule(
+            content_id=content_id,
+            platform=platform,
+            status="recurring",
+            use_day_counter=use_day_counter,
+            hour=hour,
+            minute=minute,
+            # scheduled_time is not relevant for recurring jobs but the field is non-nullable
+            # We can set it to the current time as a placeholder.
+            scheduled_time=datetime.utcnow()
+        )
+        db.add(new_schedule)
+        db.commit()
         
-        return {"message": "Daily schedule created successfully"}
+        logger.info(f"Daily schedule intent for content {content_id} created successfully.")
+        return {"message": "Daily schedule intent created successfully. The scheduler will pick it up shortly."}
         
     except HTTPException:
         raise
@@ -395,11 +408,11 @@ async def create_one_time_schedule(
         db.commit()
         db.refresh(new_schedule)
 
-        # Add the job to the APScheduler instance
-        await scheduler.schedule_upload(new_schedule)
+        # The scheduler service will now pick this up automatically.
+        # We no longer need to call the scheduler directly from the web app.
 
-        logger.info(f"Successfully scheduled content {content_id} for one-time upload at {scheduled_time}")
-        return {"message": "Content scheduled for one-time upload successfully."}
+        logger.info(f"Successfully created one-time schedule intent for content {content_id} at {scheduled_time}")
+        return {"message": "Content schedule intent created successfully. The scheduler will pick it up shortly."}
 
     except HTTPException:
         raise
