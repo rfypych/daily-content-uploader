@@ -237,7 +237,7 @@ async def health_check():
 async def get_contents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all contents with pagination"""
     contents = db.query(Content).offset(skip).limit(limit).all()
-    return contents
+    return {"contents": contents}
 
 @app.post("/schedule/daily")
 async def create_daily_schedule(request: dict, db: Session = Depends(get_db)):

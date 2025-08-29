@@ -6,10 +6,10 @@
 
 ### *Simple and Powerful Instagram Post Automation*
 
-[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-green.svg)](https://fastapi.tiangolo.com)
-[![instagrapi](https://img.shields.io/badge/instagrapi-2.2.1-purple.svg)](https://github.com/subzeroid/instagrapi)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Framework](https://img.shields.io/badge/FastAPI-0.116+-green.svg?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![Scheduler](https://img.shields.io/badge/Scheduler-APScheduler-blueviolet.svg?style=for-the-badge)](https://apscheduler.readthedocs.io)
+[![Uploader](https://img.shields.io/badge/Engine-instagrapi-purple.svg?style=for-the-badge)](https://github.com/subzeroid/instagrapi)
 
 **🎯 Set & Forget - Upload and schedule Instagram content 24/7 without manual intervention!**
 
@@ -25,9 +25,9 @@
 
 | 🎯 **Core Features** | 🔧 **Technical Features** | 🚀 **Advanced Features** |
 |:---:|:---:|:---:|
-| 📱 **Instagram Automation**<br/>Focused on a single platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>APScheduler Integration |
-| 📅 **Auto Scheduling**<br/>Set & Forget | 🗄️ **Database Management**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Secure & efficient login |
-| 🎨 **Web Dashboard**<br/>Modern UI/UX | 🌐 **Production Ready**<br/>Gunicorn + Web Server | 📊 **Analytics & Monitoring**<br/>Real-time Status |
+| 📱 **Instagram Automation**<br/>Focused on a single platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>Polling Service |
+| 📅 **Auto Scheduling**<br/>One-time & Recurring | 🗄️ **Database Agnostic**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Secure & efficient login |
+| 🎨 **Web Dashboard**<br/>Modern UI/UX | 🌐 **Production Ready**<br/>Gunicorn + Uvicorn | 📊 **Content Management**<br/>History & Status |
 
 </div>
 
@@ -62,7 +62,7 @@ This step prepares the configuration, database, and most importantly, performs t
     ```bash
     python3 setup.py
     ```
-    - This script will create the database (`daily_content.db`).
+    - This script will create the database.
     - It will then attempt to log in to Instagram.
     - **IMPORTANT:** Instagram will send a verification code (2FA) to your email. The script will pause and ask you to enter the 6-digit code in the terminal.
     - After entering the code correctly, the script will create a `session.json` file. This file is your key for automatic logins in the future.
@@ -71,13 +71,10 @@ Once `setup.py` is complete and `session.json` is successfully created, you are 
 
 ### **Step 2: Running the Application**
 
-The application consists of two main components that must be run separately in a production environment: the **Web Server** and the **Scheduler**.
+The application consists of two main components that must be run separately: the **Web Server** and the **Scheduler Service**.
 
--   **Web Server:** Handles the user interface (dashboard) and API requests.
--   **Scheduler:** Runs in the background to process scheduled uploads.
-
-**For Development:**
-You can run both processes in two separate terminals.
+#### **For Development**
+For local testing, you can run both processes in two separate terminals.
 -   **Terminal 1 (Web Server):**
     ```bash
     python3 main.py
@@ -87,17 +84,22 @@ You can run both processes in two separate terminals.
     python3 run_scheduler.py
     ```
 
-**For Production:**
-It is crucial to run both as persistent services using a process manager like `pm2` or `supervisor`. For a simple setup, you can use `nohup`.
--   **Process 1 (Web Server with Gunicorn):**
+#### **For Production**
+It is crucial to run both as persistent background services. Using `nohup` with log redirection is a robust way to achieve this.
+
+1.  **Start the Web Server:**
     ```bash
-    nohup gunicorn -c gunicorn_config.py main:app &
+    nohup gunicorn -c gunicorn_config.py main:app > gunicorn.log 2>&1 &
     ```
--   **Process 2 (Scheduler):**
+    This command starts the Gunicorn web server in the background and saves all its output to `gunicorn.log`.
+
+2.  **Start the Scheduler Service:**
     ```bash
-    nohup python3 run_scheduler.py &
+    nohup python3 run_scheduler.py > scheduler.log 2>&1 &
     ```
-You can now access the web dashboard at `http://your_server_address:PORT` to start uploading and scheduling content. The scheduler will automatically pick up tasks from the database.
+    This command starts the scheduler service in the background and saves all its output to `scheduler.log`.
+
+You can now access the web dashboard at `http://your_server_address:PORT`. The scheduler will run independently, polling the database for new jobs.
 
 ---
 
