@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from database import SessionLocal
 from models import Schedule
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 
 async def load_and_reschedule_jobs():
     """
@@ -28,7 +28,7 @@ async def load_and_reschedule_jobs():
         # Load one-time pending jobs
         pending_schedules = db.query(Schedule).filter(
             Schedule.status == 'pending',
-            Schedule.scheduled_time > datetime.now(datetime.UTC) # Only schedule future jobs
+            Schedule.scheduled_time > datetime.now(timezone.utc) # Only schedule future jobs
         ).all()
 
         logger.info(f"Found {len(pending_schedules)} pending one-time jobs to reschedule.")

@@ -37,7 +37,7 @@ def _get_instagrapi_client() -> Client:
         cl.load_settings(SESSION_FILE)
         cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
         # It's good practice to make a lightweight API call to check if the session is valid.
-        cl.get_timeline_feed(amount=1)
+        cl.get_timeline_feed()
         logging.info("Session is valid and login successful.")
         return cl
     except LoginRequired:
