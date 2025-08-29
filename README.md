@@ -1,105 +1,124 @@
-# Social Media Uploader
+<div align="center">
 
-This is a simple web application to upload and schedule posts to social media platforms. It uses a Flask web interface and a background scheduler to automate posting.
+[**English**](#) | [**Bahasa Indonesia**](./README_ID.md)
 
-**DISCLAIMER:** This application interacts with the private, internal APIs of Instagram. This is against their Terms of Service and can result in temporary or permanent blocks of your account. Use this tool at your own risk. The TikTok functionality is currently non-operational.
+# 🚀 Instagram Content Uploader
 
-## Features
+### *Simple and Powerful Instagram Post Automation*
 
-*   **Web-Based UI:** An easy-to-use dashboard for uploading and scheduling content.
-*   **Instagram Support:**
-    *   Upload single Photos.
-    *   Upload single Videos.
-    *   Upload videos as Reels.
-    *   Upload multiple images/videos as an Album (Carousel).
-    *   Upload photos or videos to your Story.
-*   **Scheduling:** Schedule posts for a future date and time.
-*   **Dynamic Captions:** Optional "Day X" feature to automatically number your daily posts.
+[![Python](https://img.shields.io/badge/Python-3.9+-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.116+-green.svg)](https://fastapi.tiangolo.com)
+[![instagrapi](https://img.shields.io/badge/instagrapi-2.2.1-purple.svg)](https://github.com/subzeroid/instagrapi)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Setup Instructions
+**🎯 Set & Forget - Upload and schedule Instagram content 24/7 without manual intervention!**
 
-Follow these steps carefully to get the application running.
+[🚀 Installation Guide](#-installation--setup-guide) • [✨ Key Features](#-key-features)
 
-### 1. Clone the Repository
+---
 
-```bash
-git clone <repository_url>
-cd <repository_directory>
-```
+</div>
 
-### 2. Install Dependencies
+## ✨ **Key Features**
 
-It is highly recommended to use a virtual environment.
+<div align="center">
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+| 🎯 **Core Features** | 🔧 **Technical Features** | 🚀 **Advanced Features** |
+|:---:|:---:|:---:|
+| 📱 **Instagram Automation**<br/>Focused on a single platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>APScheduler Integration |
+| 📅 **Auto Scheduling**<br/>Set & Forget | 🗄️ **Database Management**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Secure & efficient login |
+| 🎨 **Web Dashboard**<br/>Modern UI/UX | 🌐 **Production Ready**<br/>Gunicorn + Web Server | 📊 **Analytics & Monitoring**<br/>Real-time Status |
 
-### 3. Configure Credentials
+</div>
 
-Create a `.env` file by copying the example file.
+---
 
-```bash
-cp .env.example .env
-```
+## 🚀 **Installation & Setup Guide**
 
-Now, open the `.env` file with a text editor and add your Instagram username and password:
+Follow these two main steps to get the application running.
 
-```
-INSTAGRAM_USERNAME="your_instagram_username"
-INSTAGRAM_PASSWORD="your_instagram_password"
-```
+### **Step 1: Initial Setup (Only Needs to be Done Once)**
 
-### 4. Generate Instagram Session (CRITICAL STEP)
+This step prepares the configuration, database, and most importantly, performs the initial login to Instagram to save your session.
 
-Because this tool logs in non-interactively, you must create a session file first. This step handles Instagram's two-factor authentication (2FA) challenge. You only need to do this once.
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/your-repo/your-project.git
+    cd daily-content-uploader
+    ```
 
-Run the setup script:
+2.  **Install Dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-```bash
-python3 setup.py
-```
+3.  **Configure Environment:** Copy the example file to a new `.env` file.
+    ```bash
+    cp .env.example .env
+    ```
+    Open the `.env` file and fill in your Instagram credentials (`INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`). You can also change the `PORT` and `TIMEZONE` if needed.
 
-The script will prompt you for a 2FA code that Instagram sends to your email or authenticator app. Enter it when asked. This will create a `session.json` file, allowing the application to log in automatically in the future.
+4.  **Run the Interactive Setup Script:** Run the `setup.py` script from your terminal.
+    ```bash
+    python3 setup.py
+    ```
+    - This script will create the database (`daily_content.db`).
+    - It will then attempt to log in to Instagram.
+    - **IMPORTANT:** Instagram will send a verification code (2FA) to your email. The script will pause and ask you to enter the 6-digit code in the terminal.
+    - After entering the code correctly, the script will create a `session.json` file. This file is your key for automatic logins in the future.
 
-## Running the Application
+Once `setup.py` is complete and `session.json` is successfully created, you are ready for the next step.
 
-This application requires two separate processes to be running simultaneously in two different terminal windows.
+### **Step 2: Running the Application**
 
-### Terminal 1: Run the Web Server
+The application consists of two main components that must be run separately in a production environment: the **Web Server** and the **Scheduler**.
 
-The web server handles the user interface and API requests. We use Gunicorn, and its settings are controlled by the `gunicorn_config.py` file. This allows for flexible configuration (like setting the port) via the `.env` file.
+-   **Web Server:** Handles the user interface (dashboard) and API requests.
+-   **Scheduler:** Runs in the background to process scheduled uploads.
 
-```bash
-gunicorn -c gunicorn_config.py main:app
-```
+**For Development:**
+You can run both processes in two separate terminals.
+-   **Terminal 1 (Web Server):**
+    ```bash
+    python3 main.py
+    ```
+-   **Terminal 2 (Scheduler):**
+    ```bash
+    python3 run_scheduler.py
+    ```
 
-You can now access the web dashboard by navigating to `http://localhost:2010` (or whichever port you have set in your `.env` file) in your web browser.
+**For Production:**
+It is crucial to run both as persistent services using a process manager like `pm2` or `supervisor`. For a simple setup, you can use `nohup`.
+-   **Process 1 (Web Server with Gunicorn):**
+    ```bash
+    nohup gunicorn -c gunicorn_config.py main:app &
+    ```
+-   **Process 2 (Scheduler):**
+    ```bash
+    nohup python3 run_scheduler.py &
+    ```
+You can now access the web dashboard at `http://your_server_address:PORT` to start uploading and scheduling content. The scheduler will automatically pick up tasks from the database.
 
-### Terminal 2: Run the Scheduler
+---
 
-The scheduler is responsible for executing the scheduled posts at their designated time.
+### 📖 **Dashboard Usage Guide**
 
-```bash
-python3 run_scheduler.py
-```
+-   **Upload Content:** Click the "New Upload" button. Fill out the form, select a video/image file, write a caption, and click "Upload".
+-   **Publish Immediately:** In the "Content History" list, click the "share" icon (arrow) to publish content instantly.
+-   **Schedule a Post:** Use the "Schedule for a specific time" button (calendar icon) for one-time posts, or create a recurring schedule from the "Daily Schedule" menu.
 
-This process must remain running in the background for schedules to work.
+---
 
-## Usage
+## 🆘 **Troubleshooting**
 
-1.  Navigate to `http://localhost:8000`.
-2.  Use the form to select the post type (Photo, Video, Reel, etc.).
-3.  Upload your media file(s).
-4.  Write your caption.
-5.  (Optional) Check the "Daily Schedule" box and enter a start date and day number for dynamic "Day X" captions.
-6.  (Optional) Set a future date and time to schedule the post.
-7.  Click "Upload".
+*   **Error `Address already in use`:** Make sure no other process is using the same port. You can change the `PORT` in your `.env` file to another number (e.g., 8008).
+*   **Persistent Login Failures:** Delete the `session.json` file and re-run `python3 setup.py` to perform the interactive login process again.
+*   **File Not Uploading:** Check the permissions of the `uploads/` folder. Ensure the user running the application has write permissions (`chmod 755 uploads`).
+*   **Database Error (e.g., "Unknown column"):** This can happen if you update the application code after the database has already been created. To fix this, you need to reset your database. Run the setup script with the `--reset-db` flag. **Warning: This will delete all your existing content and schedules.**
+    ```bash
+    python3 setup.py --reset-db
+    ```
 
-## Known Issues
+---
 
-*   **TikTok Uploads:** The TikTok functionality is **completely broken** due to CAPTCHA and login challenges. It is disabled.
-*   **Story Captions:** Instagram's private API (via `instagrapi`) does not support adding a text caption directly when uploading a story. The caption field is ignored for Story uploads.
-*   **Session Invalidation:** Your `session.json` may occasionally become invalid. If you encounter login errors, simply delete `session.json` and run `python3 setup.py` again.
+**Happy Content Creating! 🎉**
