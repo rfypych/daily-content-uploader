@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException, Depends, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Depends, Request, UploadFile, File, Form, status
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pathlib import Path
 import os
 import logging
 import uvicorn
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import shutil
 import aiofiles
 from contextlib import asynccontextmanager
@@ -16,17 +16,14 @@ from contextlib import asynccontextmanager
 from database import SessionLocal, engine, Base, init_database, get_db
 from models import Content, Schedule, Account
 from automation import ContentUploader
-# Scheduler is now a separate service and not imported directly.
+import auth
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 print("Database tables created successfully")
 
 # Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Initialize content uploader
@@ -34,39 +31,25 @@ uploader = ContentUploader()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan event handler for startup and shutdown."""
     logger.info("Starting Daily Content Uploader Web Server...")
     logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'development')}")
     logger.info(f"Database URL: {os.getenv('DATABASE_URL', 'Not configured')}")
     yield
     logger.info("Shutting down Daily Content Uploader Web Server...")
 
-# FastAPI app with lifespan
-app = FastAPI(
-    title="Daily Content Uploader",
-    description="Automated Instagram & TikTok Content Upload System",
-    version="1.0.0",
-    lifespan=lifespan
-)
+app = FastAPI(title="Daily Content Uploader", version="1.1.0", lifespan=lifespan)
 
-# CORS middleware
 allowed_origins = os.getenv("CORS_ORIGINS", "*").split(",")
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    CORSMiddleware, allow_origins=allowed_origins, allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
 )
 
-# Initialize database
 init_database()
 
-# Setup directories
 UPLOAD_FOLDER = os.getenv("UPLOAD_FOLDER", "./uploads")
 STATIC_FOLDER = "./static"
 TEMPLATES_FOLDER = "./templates"
-
 Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)
 Path(STATIC_FOLDER).mkdir(exist_ok=True)
 Path(TEMPLATES_FOLDER).mkdir(exist_ok=True)
@@ -75,64 +58,63 @@ app.mount("/static", StaticFiles(directory=STATIC_FOLDER), name="static")
 app.mount("/uploads", StaticFiles(directory=UPLOAD_FOLDER), name="uploads")
 templates = Jinja2Templates(directory=TEMPLATES_FOLDER)
 
-def parse_file_size(size_str):
-    if not size_str: return 104857600
-    size_str = size_str.upper().strip()
-    if size_str.isdigit(): return int(size_str)
-    units = {'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3}
-    for unit in units:
-        if size_str.endswith(unit):
-            try:
-                number = float(size_str[:-len(unit)])
-                return int(number * units[unit])
-            except ValueError: break
-    return 104857600
 
-MAX_FILE_SIZE = parse_file_size(os.getenv("MAX_FILE_SIZE", "100MB"))
-ALLOWED_EXTENSIONS = os.getenv("ALLOWED_EXTENSIONS", "jpg,jpeg,png,gif,mp4,mov,avi").split(",")
+# --- Authentication Endpoints ---
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.post("/login")
+async def login_for_access_token(
+    response: JSONResponse,
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
+):
+    user = db.query(Account).filter(Account.platform == "webapp", Account.username == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.password):
+        return templates.TemplateResponse("login.html", {
+            "request": {},
+            "error": "Incorrect username or password"
+        }, status_code=400)
+
+    access_token = auth.create_access_token(data={"sub": user.username})
+    response = RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
+    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True)
+    return response
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(url="/login")
+    response.delete_cookie(key="access_token")
+    return response
+
+# --- Protected Endpoints ---
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, db: Session = Depends(get_db)):
-    """Main dashboard to manage content."""
-    try:
-        contents = db.query(Content).order_by(Content.created_at.desc()).limit(10).all()
-        schedules = db.query(Schedule).filter(Schedule.status == "pending").all()
-        total_contents = db.query(Content).count()
-        pending_schedules = db.query(Schedule).filter(Schedule.status == "pending").count()
-        published_contents = db.query(Content).filter(Content.status == "published").count()
-        recurring_schedules_q = db.query(Schedule).filter(Schedule.status == 'recurring').all()
-        recurring_map = {s.content_id: s for s in recurring_schedules_q}
+async def dashboard(request: Request, db: Session = Depends(get_db), current_user: dict = Depends(auth.get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/login")
 
-        return templates.TemplateResponse("dashboard.html", {
-            "request": request,
-            "contents": contents,
-            "schedules": schedules,
-            "recurring_map": recurring_map,
-            "stats": {
-                "total_contents": total_contents,
-                "pending_schedules": pending_schedules,
-                "published_contents": published_contents
-            }
-        })
-    except Exception as e:
-        logger.error(f"Error loading dashboard: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+    contents = db.query(Content).order_by(Content.created_at.desc()).limit(10).all()
+    schedules = db.query(Schedule).filter(Schedule.status == "pending").all()
+    total_contents = db.query(Content).count()
+    pending_schedules = db.query(Schedule).filter(Schedule.status == "pending").count()
+    published_contents = db.query(Content).filter(Content.status == "published").count()
+    recurring_schedules_q = db.query(Schedule).filter(Schedule.status == 'recurring').all()
+    recurring_map = {s.content_id: s for s in recurring_schedules_q}
 
-def validate_file(file: UploadFile) -> bool:
-    if not file.filename: return False
-    file_ext = file.filename.split(".")[-1].lower()
-    if file_ext not in ALLOWED_EXTENSIONS: return False
-    return True
-
-from typing import List
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request, "contents": contents, "schedules": schedules,
+        "recurring_map": recurring_map, "current_user": current_user,
+        "stats": {"total_contents": total_contents, "pending_schedules": pending_schedules, "published_contents": published_contents}
+    })
 
 @app.post("/upload")
 async def upload_content(
-    files: List[UploadFile] = File(...),
-    caption: str = Form(""),
-    post_type: str = Form(...),
-    db: Session = Depends(get_db)
+    files: List[UploadFile] = File(...), caption: str = Form(""),
+    post_type: str = Form(...), db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user)
 ):
     if not files:
         raise HTTPException(status_code=400, detail="No files were uploaded.")
@@ -183,8 +165,12 @@ async def upload_content(
         logger.error(f"Error uploading content: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
 @app.post("/publish/{content_id}")
-async def publish_content(content_id: int, platform: str, db: Session = Depends(get_db)):
+async def publish_content(
+    content_id: int, platform: str, db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user)
+):
     content = db.query(Content).filter(Content.id == content_id).first()
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
@@ -205,14 +191,12 @@ async def publish_content(content_id: int, platform: str, db: Session = Depends(
         logger.error(f"Failed to publish content {content_id} to {platform}")
         raise HTTPException(status_code=500, detail="Failed to publish content")
 
-@app.get("/schedules")
-async def get_schedules(db: Session = Depends(get_db)):
-    """Get all pending schedules"""
-    schedules = db.query(Schedule).filter(Schedule.status == "pending").all()
-    return schedules
 
 @app.delete("/content/{content_id}")
-async def delete_content(content_id: int, db: Session = Depends(get_db)):
+async def delete_content(
+    content_id: int, db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user)
+):
     content = db.query(Content).filter(Content.id == content_id).first()
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
@@ -229,18 +213,12 @@ async def delete_content(content_id: int, db: Session = Depends(get_db)):
     logger.info(f"Content {content_id} deleted successfully")
     return {"message": "Content deleted successfully"}
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
-
-@app.get("/api/contents")
-async def get_contents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    """Get all contents with pagination"""
-    contents = db.query(Content).offset(skip).limit(limit).all()
-    return {"contents": contents}
 
 @app.post("/schedule/daily")
-async def create_daily_schedule(request: dict, db: Session = Depends(get_db)):
+async def create_daily_schedule(
+    request: dict, db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user)
+):
     """Creates a daily recurring schedule intent."""
     content_id = request.get("content_id")
     platform = request.get("platform")
@@ -273,8 +251,12 @@ async def create_daily_schedule(request: dict, db: Session = Depends(get_db)):
     logger.info(f"Daily schedule intent for content {content_id} created successfully.")
     return {"message": "Daily schedule intent created. The scheduler will pick it up shortly."}
 
+
 @app.post("/schedule/once")
-async def create_one_time_schedule(request: dict, db: Session = Depends(get_db)):
+async def create_one_time_schedule(
+    request: dict, db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user)
+):
     """Creates a one-time schedule intent."""
     content_id = request.get("content_id")
     platform = request.get("platform")
@@ -302,9 +284,24 @@ async def create_one_time_schedule(request: dict, db: Session = Depends(get_db))
     logger.info(f"One-time schedule intent for content {content_id} created at {scheduled_time}")
     return {"message": "Content schedule intent created. The scheduler will pick it up shortly."}
 
+
+# --- Public/Utility Endpoints ---
+
+@app.get("/api/contents")
+async def get_contents(
+    skip: int = 0, limit: int = 100, db: Session = Depends(get_db),
+    current_user: dict = Depends(auth.get_current_user) # Also protect this
+):
+    contents = db.query(Content).offset(skip).limit(limit).all()
+    return {"contents": contents}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 2009))
     host = os.getenv("HOST", "0.0.0.0")
     reload = os.getenv("DEBUG", "false").lower() == "true"
-    
     uvicorn.run("main:app", host=host, port=port, reload=reload)
