@@ -65,8 +65,8 @@ async def check_and_run_schedules():
 
                 if run_job:
                     logger.info(f"Executing job for schedule {schedule.id}...")
-                    # We pass the original schedule object, execute_upload_logic handles the rest
-                    await execute_upload_logic(schedule)
+                    # Pass the current db session to the execution logic
+                    await execute_upload_logic(db, schedule)
 
                     # After execution, update the last_run_at timestamp in UTC
                     if schedule.status == 'recurring':

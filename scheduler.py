@@ -7,18 +7,16 @@ from automation import ContentUploader
 
 logger = logging.getLogger(__name__)
 
-async def execute_upload_logic(schedule: Schedule):
+from sqlalchemy.orm import Session
+
+async def execute_upload_logic(db: Session, schedule: Schedule):
     """
     This is the core logic that performs the upload for a given schedule.
-    It's called directly by the new scheduler loop in `run_scheduler.py`.
+    It uses the database session passed from the caller.
     """
     logger.info(f"--- Executing job for schedule_id: {schedule.id} ---")
-    db = SessionLocal()
     try:
-        # The schedule object is passed in directly, no need to query for it.
-        # But we need to ensure it's attached to the current session.
-        db.add(schedule)
-
+        # The schedule object is already in the session from the caller.
         content_to_upload = db.query(Content).filter(Content.id == schedule.content_id).first()
         if not content_to_upload:
             logger.error(f"Execution failed: Content {schedule.content_id} not found for schedule {schedule.id}.")
@@ -67,5 +65,5 @@ async def execute_upload_logic(schedule: Schedule):
             schedule_to_fail.error_message = str(e)
             db.commit()
     finally:
-        db.close()
+        # The session is managed by the caller, so we don't close it here.
         logger.info(f"--- Finished execution for schedule_id: {schedule.id} ---")
