@@ -8,7 +8,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Framework](https://img.shields.io/badge/FastAPI-0.116+-green.svg?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
-[![Scheduler](https://img.shields.io/badge/Scheduler-APScheduler-blueviolet.svg?style=for-the-badge)](https://apscheduler.readthedocs.io)
+[![Scheduler](https://img.shields.io/badge/Scheduler-Custom-blueviolet.svg?style=for-the-badge)](./run_scheduler.py)
 [![Uploader](https://img.shields.io/badge/Engine-instagrapi-purple.svg?style=for-the-badge)](https://github.com/subzeroid/instagrapi)
 
 **🎯 Set & Forget - Upload dan jadwalkan konten Instagram 24/7 tanpa intervensi manual!**
@@ -25,7 +25,7 @@
 
 | 🎯 **Fitur Inti** | 🔧 **Fitur Teknis** | 🚀 **Fitur Lanjutan** |
 |:---:|:---:|:---:|
-| 📱 **Otomasi Instagram**<br/>Fokus pada satu platform | 🤖 **Private API**<br/>Mesin instagrapi | ⏰ **Penjadwal Cerdas**<br/>Servis Polling |
+| 📱 **Otomasi Instagram**<br/>Fokus pada satu platform | 🤖 **Private API**<br/>Mesin instagrapi | ⏰ **Penjadwal Cerdas**<br/>Servis Polling Kustom |
 | 📅 **Penjadwalan Otomatis**<br/>Sekali Jalan & Harian | 🗄️ **Database Agnostic**<br/>Dukungan SQLite & MySQL | 🔐 **Manajemen Sesi**<br/>Login aman & efisien |
 | 🎨 **Dasbor Web**<br/>UI/UX Modern | 🌐 **Siap Produksi**<br/>Gunicorn + Uvicorn | 📊 **Manajemen Konten**<br/>Riwayat & Status |
 
@@ -56,7 +56,7 @@ Langkah ini bertujuan untuk menyiapkan konfigurasi, database, dan yang terpentin
     ```bash
     cp .env.example .env
     ```
-    Buka file `.env` tersebut dan isi kredensial Instagram Anda (`INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD`). Anda juga bisa mengganti `PORT` dan `TIMEZONE` jika diperlukan.
+    Buka file `.env` tersebut dan isi kredensial Instagram Anda (`INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD`). Anda juga bisa mengganti `PORT` dan `TIMEZONE` (misal: `Asia/Jakarta`).
 
 4.  **Jalankan Skrip Setup Interaktif:** Jalankan skrip `setup.py` dari terminal Anda.
     ```bash
@@ -73,16 +73,8 @@ Setelah `setup.py` selesai dan `session.json` berhasil dibuat, Anda siap untuk l
 
 Aplikasi ini terdiri dari dua komponen utama yang harus dijalankan secara terpisah: **Server Web** dan **Servis Penjadwal**.
 
-#### **Untuk Development**
-Untuk pengetesan lokal, Anda bisa menjalankan kedua proses di dua terminal yang terpisah.
--   **Terminal 1 (Server Web):**
-    ```bash
-    python3 main.py
-    ```
--   **Terminal 2 (Penjadwal):**
-    ```bash
-    python3 run_scheduler.py
-    ```
+-   **Server Web (`main.py`):** Menangani antarmuka pengguna (dasbor) dan permintaan API untuk membuat konten dan "niat" jadwal.
+-   **Servis Penjadwal (`run_scheduler.py`):** Servis yang dibuat khusus yang berjalan di latar belakang. Ia secara berkala memeriksa database untuk "niat" jadwal baru, dan ketika pekerjaan jatuh tempo, ia menjalankan unggahan.
 
 #### **Untuk Produksi**
 Sangat penting untuk menjalankan keduanya sebagai servis latar belakang yang persisten. Menggunakan `nohup` dengan pengalihan log adalah cara yang kuat untuk mencapai ini.
@@ -99,7 +91,7 @@ Sangat penting untuk menjalankan keduanya sebagai servis latar belakang yang per
     ```
     Perintah ini memulai servis penjadwal di latar belakang dan menyimpan semua outputnya ke `scheduler.log`.
 
-Anda sekarang dapat mengakses dasbor web di `http://alamat_server_anda:PORT`. Penjadwal akan berjalan secara independen, memeriksa database untuk pekerjaan baru.
+Anda sekarang dapat mengakses dasbor web di `http://alamat_server_anda:PORT`.
 
 ---
 
