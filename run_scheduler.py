@@ -1,13 +1,14 @@
 import asyncio
 import logging
 import os
+import pytz
 from dotenv import load_dotenv
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
 
 # Load environment variables first
 load_dotenv()
 
-from scheduler import scheduler, execute_scheduled_upload, execute_recurring_job
+from scheduler import execute_upload_logic
 from database import SessionLocal
 from models import Schedule
 
@@ -15,88 +16,85 @@ from models import Schedule
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(asctime)s - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-async def discover_and_schedule_jobs():
+async def check_and_run_schedules():
     """
-    Periodically discovers new schedule 'intents' from the database
-    and adds them to the live APScheduler.
+    The core function of the custom scheduler.
+    - Fetches all active schedules (`pending` or `recurring`).
+    - Checks if they are due to be run.
+    - Executes them if they are.
     """
     db = SessionLocal()
     try:
-        logger.info("Checking for new jobs to schedule...")
+        logger.info("Checking for due schedules...")
 
-        # Find all schedule intents that haven't been processed yet
-        new_schedules = db.query(Schedule).filter(Schedule.is_scheduled == False).all()
+        now_utc = datetime.now(timezone.utc)
+        active_schedules = db.query(Schedule).filter(
+            (Schedule.status == 'pending') | (Schedule.status == 'recurring')
+        ).all()
 
-        if not new_schedules:
-            logger.info("No new jobs found.")
+        if not active_schedules:
+            logger.info("No active schedules found.")
             return
 
-        logger.info(f"Found {len(new_schedules)} new jobs to add to the scheduler.")
+        logger.info(f"Found {len(active_schedules)} active schedule(s) to evaluate.")
 
-        for schedule in new_schedules:
-            job_id = None
+        for schedule in active_schedules:
             try:
+                run_job = False
+                # --- Logic for one-time jobs ---
                 if schedule.status == 'pending':
-                    # This is a one-time job
-                    job_id = f"upload_{schedule.id}"
-                    scheduler.scheduler.add_job(
-                        func=execute_scheduled_upload,
-                        trigger='date',
-                        run_date=schedule.scheduled_time,
-                        args=[schedule.id],
-                        id=job_id,
-                        replace_existing=True
-                    )
-                    logger.info(f"Scheduled one-time job '{job_id}' for {schedule.scheduled_time}.")
+                    # Compare timezone-aware and naive datetimes correctly
+                    if now_utc >= schedule.scheduled_time.replace(tzinfo=timezone.utc):
+                        logger.info(f"One-time job {schedule.id} is due (scheduled for {schedule.scheduled_time}).")
+                        run_job = True
 
+                # --- Logic for recurring jobs ---
                 elif schedule.status == 'recurring':
-                    # This is a recurring (daily) job
-                    job_id = f"daily_{schedule.id}"
-                    user_timezone = os.getenv('TIMEZONE', 'UTC')
-                    scheduler.scheduler.add_job(
-                        func=execute_recurring_job,
-                        trigger='cron',
-                        hour=schedule.hour,
-                        minute=schedule.minute,
-                        timezone=user_timezone,
-                        args=[schedule.id],
-                        id=job_id,
-                        replace_existing=True
-                    )
-                    logger.info(f"Scheduled recurring job '{job_id}' for {schedule.hour:02d}:{schedule.minute:02d} ({user_timezone}).")
+                    user_timezone_str = os.getenv('TIMEZONE', 'UTC')
+                    user_timezone = pytz.timezone(user_timezone_str)
+                    now_in_user_tz = datetime.now(user_timezone)
 
-                # If scheduling was successful, mark it as processed
-                schedule.is_scheduled = True
-                db.commit()
-                logger.info(f"Successfully processed and marked schedule {schedule.id}.")
+                    # Check if it's the right time of day in the user's timezone
+                    if now_in_user_tz.hour == schedule.hour and now_in_user_tz.minute == schedule.minute:
+                        # Check if it has already run today (in the user's timezone)
+                        if schedule.last_run_at is None or schedule.last_run_at.astimezone(user_timezone).date() < now_in_user_tz.date():
+                            logger.info(f"Recurring job {schedule.id} is due (scheduled for {schedule.hour:02d}:{schedule.minute:02d} in {user_timezone_str}).")
+                            run_job = True
+                        else:
+                            logger.info(f"Recurring job {schedule.id} has already run today at {schedule.last_run_at.astimezone(user_timezone)}.")
+
+                if run_job:
+                    logger.info(f"Executing job for schedule {schedule.id}...")
+                    # We pass the original schedule object, execute_upload_logic handles the rest
+                    await execute_upload_logic(schedule)
+
+                    # After execution, update the last_run_at timestamp in UTC
+                    if schedule.status == 'recurring':
+                        schedule_in_db = db.query(Schedule).filter(Schedule.id == schedule.id).first()
+                        if schedule_in_db:
+                            schedule_in_db.last_run_at = now_utc
+                            db.commit()
 
             except Exception as e:
-                logger.error(f"Failed to schedule job for schedule_id {schedule.id}: {e}", exc_info=True)
-                # We don't commit here, so it can be picked up on the next run
+                logger.error(f"Error processing schedule {schedule.id}: {e}", exc_info=True)
 
     finally:
         db.close()
 
+
 async def main():
     """
-    Main function to start the scheduler and run the discovery loop.
+    Main function to start the scheduler service loop.
     """
-    logger.info("--- Starting Scheduler Service ---")
-
-    # Start the underlying APScheduler engine. It will run in the background.
-    await scheduler.start()
+    logger.info("--- Starting Custom Scheduler Service ---")
 
     try:
-        # This is the main service loop
         while True:
-            await discover_and_schedule_jobs()
+            await check_and_run_schedules()
             logger.info("Scheduler service sleeping for 60 seconds...")
             await asyncio.sleep(60)
     except (KeyboardInterrupt, SystemExit):
         logger.info("Scheduler service shutting down.")
-    finally:
-        await scheduler.stop()
 
 if __name__ == "__main__":
-    # This check is important for multiprocessing safety
     asyncio.run(main())

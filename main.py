@@ -8,7 +8,7 @@ from pathlib import Path
 import os
 import logging
 import uvicorn
-from datetime import datetime
+from datetime import datetime, timezone
 import shutil
 import aiofiles
 from contextlib import asynccontextmanager
@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 from database import SessionLocal, engine, Base, init_database, get_db
 from models import Content, Schedule, Account
 from automation import ContentUploader
-from scheduler import scheduler
+# Scheduler is now a separate service and not imported directly.
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -231,7 +231,7 @@ async def delete_content(content_id: int, db: Session = Depends(get_db)):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @app.get("/api/contents")
 async def get_contents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
@@ -259,11 +259,13 @@ async def create_daily_schedule(request: dict, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Content not found")
 
     use_day_counter = request.get("use_day_counter", False)
+    start_day = request.get("start_day", 1)
 
     new_schedule = Schedule(
         content_id=content_id, platform=platform, status="recurring",
         use_day_counter=use_day_counter, hour=hour, minute=minute,
-        scheduled_time=datetime.utcnow()
+        day_counter=int(start_day),
+        scheduled_time=datetime.now(timezone.utc)
     )
     db.add(new_schedule)
     db.commit()

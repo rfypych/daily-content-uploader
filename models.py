@@ -32,7 +32,7 @@ class Schedule(Base):
     status = Column(String(50), default="pending")  # pending, completed, failed, recurring
     error_message = Column(Text)
     retry_count = Column(Integer, default=0)
-    is_scheduled = Column(Boolean, default=False, nullable=False) # Has the scheduler service picked up this job?
+    last_run_at = Column(DateTime, nullable=True) # Tracks the last execution for recurring jobs
 
     # For daily counter feature
     use_day_counter = Column(Boolean, default=False)
