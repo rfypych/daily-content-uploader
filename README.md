@@ -8,7 +8,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Framework](https://img.shields.io/badge/FastAPI-0.116+-green.svg?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
-[![Scheduler](https://img.shields.io/badge/Scheduler-APScheduler-blueviolet.svg?style=for-the-badge)](https://apscheduler.readthedocs.io)
+[![Scheduler](https://img.shields.io/badge/Scheduler-Custom-blueviolet.svg?style=for-the-badge)](./run_scheduler.py)
 [![Uploader](https://img.shields.io/badge/Engine-instagrapi-purple.svg?style=for-the-badge)](https://github.com/subzeroid/instagrapi)
 
 **🎯 Set & Forget - Upload and schedule Instagram content 24/7 without manual intervention!**
@@ -25,7 +25,7 @@
 
 | 🎯 **Core Features** | 🔧 **Technical Features** | 🚀 **Advanced Features** |
 |:---:|:---:|:---:|
-| 📱 **Instagram Automation**<br/>Focused on a single platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Smart Scheduler**<br/>Polling Service |
+| 📱 **Instagram Automation**<br/>Focused on a single platform | 🤖 **Private API**<br/>instagrapi Engine | ⏰ **Custom Scheduler**<br/>Reliable Polling Service |
 | 📅 **Auto Scheduling**<br/>One-time & Recurring | 🗄️ **Database Agnostic**<br/>SQLite & MySQL Support | 🔐 **Session Management**<br/>Secure & efficient login |
 | 🎨 **Web Dashboard**<br/>Modern UI/UX | 🌐 **Production Ready**<br/>Gunicorn + Uvicorn | 📊 **Content Management**<br/>History & Status |
 
@@ -56,7 +56,7 @@ This step prepares the configuration, database, and most importantly, performs t
     ```bash
     cp .env.example .env
     ```
-    Open the `.env` file and fill in your Instagram credentials (`INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`). You can also change the `PORT` and `TIMEZONE` if needed.
+    Open the `.env` file and fill in your Instagram credentials (`INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`). You can also change the `PORT` and `TIMEZONE` (e.g., `Asia/Jakarta`).
 
 4.  **Run the Interactive Setup Script:** Run the `setup.py` script from your terminal.
     ```bash
@@ -73,16 +73,8 @@ Once `setup.py` is complete and `session.json` is successfully created, you are 
 
 The application consists of two main components that must be run separately: the **Web Server** and the **Scheduler Service**.
 
-#### **For Development**
-For local testing, you can run both processes in two separate terminals.
--   **Terminal 1 (Web Server):**
-    ```bash
-    python3 main.py
-    ```
--   **Terminal 2 (Scheduler):**
-    ```bash
-    python3 run_scheduler.py
-    ```
+-   **Web Server (`main.py`):** Handles the user interface (dashboard) and API requests to create content and schedule *intents*.
+-   **Scheduler Service (`run_scheduler.py`):** A custom-built service that runs in the background. It periodically checks the database for new schedule intents, and when a job is due, it executes the upload.
 
 #### **For Production**
 It is crucial to run both as persistent background services. Using `nohup` with log redirection is a robust way to achieve this.
@@ -99,7 +91,7 @@ It is crucial to run both as persistent background services. Using `nohup` with 
     ```
     This command starts the scheduler service in the background and saves all its output to `scheduler.log`.
 
-You can now access the web dashboard at `http://your_server_address:PORT`. The scheduler will run independently, polling the database for new jobs.
+You can now access the web dashboard at `http://your_server_address:PORT`.
 
 ---
 
