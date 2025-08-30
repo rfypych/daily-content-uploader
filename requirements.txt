@@ -16,3 +16,5 @@ httpx==0.25.2
 bcrypt==4.1.2
 instagrapi==2.2.1
 pytz
+python-jose[cryptography]
+passlib[bcrypt]

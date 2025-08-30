@@ -52,6 +52,22 @@ def setup_database_and_accounts(reset_db=False):
         else:
             logging.warning("⚠️ INSTAGRAM_USERNAME tidak diatur di .env, tidak dapat menambahkan akun ke DB.")
 
+        # Create Web App User
+        WEB_USERNAME = os.getenv("WEB_USERNAME")
+        WEB_PASSWORD = os.getenv("WEB_PASSWORD")
+        if WEB_USERNAME and WEB_PASSWORD:
+            web_user_exists = db.query(Account).filter_by(platform="webapp", username=WEB_USERNAME).first()
+            if not web_user_exists:
+                web_user = Account(platform="webapp", username=WEB_USERNAME)
+                web_user.set_password(WEB_PASSWORD)
+                db.add(web_user)
+                db.commit()
+                logging.info(f"✅ Akun web '{WEB_USERNAME}' berhasil dibuat. Gunakan ini untuk login ke dashboard.")
+            else:
+                logging.info(f"✅ Akun web '{WEB_USERNAME}' sudah ada.")
+        else:
+            logging.warning("⚠️ WEB_USERNAME atau WEB_PASSWORD tidak diatur di .env. Akun web tidak dibuat.")
+
         # Ensure upload folder exists
         upload_folder = os.getenv('UPLOAD_FOLDER', './uploads')
         Path(upload_folder).mkdir(parents=True, exist_ok=True)
