@@ -35,70 +35,53 @@
 
 ## 🚀 **Installation & Setup Guide**
 
-This application uses a robust workflow to avoid triggering Instagram's security measures. The setup is divided into two parts: a one-time setup on your **local computer** and the deployment on your **server**.
+Follow these steps to get the application running on your server.
 
-### **Part 1: Session Generation (On Your Local Computer)**
-
-The most important step is to generate a `session.json` file on a trusted machine (your personal computer) to avoid server-based login challenges.
-
-1.  **Clone the Repository Locally:**
+1.  **Clone the Repository:**
     ```bash
     git clone https://github.com/your-repo/your-project.git
     cd daily-content-uploader
     ```
 
-2.  **Install Dependencies Locally:**
+2.  **Install Dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-3.  **Configure Local Environment:** Create a `.env` file from the example.
+3.  **Configure Environment:** Copy the example file to a new `.env` file.
     ```bash
     cp .env.example .env
     ```
-    Open the `.env` file and fill in your `INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`.
+    Open the `.env` file and fill in all required credentials:
+    - `INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD`
+    - `WEB_USERNAME` and `WEB_PASSWORD` (for dashboard login)
+    - `DATABASE_URL` (if not using default SQLite)
+    - `TIMEZONE` (e.g., `Asia/Jakarta`)
 
-4.  **Run Interactive Setup Locally:** Run the `setup.py` script.
+4.  **Run the Interactive Setup Script:** Run `setup.py` from your server's terminal.
     ```bash
     python3 setup.py
     ```
-    - The script will guide you through the Instagram login process.
-    - **Enter the 2FA code** sent to your email when prompted.
-    - Upon success, a `session.json` file will be created in your project directory. This file is crucial.
+    - This script will initialize the database and create the web user account.
+    - It will then attempt to log in to Instagram.
+    - **IMPORTANT:** Instagram may send a verification code (2FA) to your email. The script will pause and ask you to enter the 6-digit code in the terminal.
+    - After a successful login, it will create `session.json`. This file helps maintain the login session to avoid future challenges.
 
-### **Part 2: Server Deployment**
+### **Running the Application**
 
-Now, you will deploy the application code and the generated session file to your server.
+The application consists of two main components that must be run as persistent background services: the **Web Server** and the **Scheduler Service**.
 
-1.  **Upload Project Files:** Upload all project files (except `session.json` for now) to your server (e.g., in `/www/wwwroot/your.domain.com`).
-
-2.  **Configure Server Environment:**
-    - Create a `.env` file on the server (`cp .env.example .env`).
-    - Fill in your `DATABASE_URL`.
-    - Set the `WEB_USERNAME` and `WEB_PASSWORD` for your dashboard login.
-    - Set your `TIMEZONE` (e.g., `Asia/Jakarta`).
-    - **Leave `INSTAGRAM_USERNAME` and `INSTAGRAM_PASSWORD` blank on the server.** This is important for security.
-
-3.  **Upload the Session File:** Securely upload the `session.json` file you generated in Part 1 to the project directory on your server.
-
-4.  **Initialize Server Database:**
-    - SSH into your server and navigate to the project directory.
-    - Run the setup script **without the login part** to initialize the database and create the web user.
+1.  **Start the Web Server:**
     ```bash
-    python3 setup.py
+    nohup gunicorn -c gunicorn_config.py main:app > gunicorn.log 2>&1 &
     ```
-    *(Because INSTAGRAM_USERNAME is blank in the server's .env, it will skip the interactive login part).*
+    This command starts the Gunicorn web server in the background and saves its logs to `gunicorn.log`.
 
-5.  **Run the Application:**
-    Run both the web server and the scheduler as persistent background services.
-    -   **Web Server:**
-        ```bash
-        nohup gunicorn -c gunicorn_config.py main:app > gunicorn.log 2>&1 &
-        ```
-    -   **Scheduler Service:**
-        ```bash
-        nohup python3 run_scheduler.py > scheduler.log 2>&1 &
-        ```
+2.  **Start the Scheduler Service:**
+    ```bash
+    nohup python3 run_scheduler.py > scheduler.log 2>&1 &
+    ```
+    This command starts the scheduler service in the background and saves its logs to `scheduler.log`.
 
 You can now access your dashboard at `http://your_server_address:PORT` and log in with your `WEB_USERNAME` and `WEB_PASSWORD`.
 
@@ -106,7 +89,7 @@ You can now access your dashboard at `http://your_server_address:PORT` and log i
 
 ## 🆘 **Troubleshooting**
 
-*   **`Session is invalid` Error:** Your `session.json` has expired or been invalidated by Instagram. You must repeat **Part 1** on your local machine to generate a new `session.json` and then re-upload only that file to your server.
+*   **`challenge_required` or `LoginRequired` Error:** This is a security measure from Instagram. Stop the application, delete `session.json` (`rm session.json`), and re-run `python3 setup.py`. You may need to enter a new 2FA code. If this persists, the server's IP may be flagged by Instagram.
 *   **Database Error (e.g., "Unknown column"):** This can happen after a code update. To fix this, you may need to reset your database. Run the setup script with the `--reset-db` flag on your server. **Warning: This will delete all your existing content and schedules.**
     ```bash
     python3 setup.py --reset-db

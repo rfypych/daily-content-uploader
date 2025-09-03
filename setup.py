@@ -65,12 +65,8 @@ def setup_database_and_accounts(reset_db=False):
         db.close()
 
 def perform_interactive_login():
-    """
-    Performs the first-time interactive login on a LOCAL machine
-    to generate a session file that can be uploaded to the server.
-    """
-    logging.info("\n--- Step 2: Interactive Instagram Login (Local Machine) ---")
-    logging.info("This step will generate a 'session.json' file to let your server securely access Instagram without using a password.")
+    """Performs the first-time interactive login to generate a session file."""
+    logging.info("\n--- Step 2: Interactive Instagram Login ---")
 
     INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
     INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
@@ -106,15 +102,9 @@ def perform_interactive_login():
         logging.info(f"Attempting to log in as {INSTAGRAM_USERNAME}...")
         cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
         cl.dump_settings(SESSION_FILE)
-        logging.info("✅ Login successful!")
-        logging.info(f"✅ Session saved to '{SESSION_FILE}'.")
-        print("\n=====================================================")
-        print("IMPORTANT: Upload the 'session.json' file to your server in the same directory as the application.")
-        print("=====================================================")
+        logging.info(f"✅ Login successful! Session saved to '{SESSION_FILE}'.")
     except Exception as e:
         logging.error(f"❌ Login failed: {e}")
-        logging.error("   This can happen due to an incorrect password, or Instagram's security measures.")
-        logging.error("   Try logging in manually from your phone first to ensure the account is active.")
 
 # --- Main Execution ---
 
@@ -124,7 +114,6 @@ if __name__ == "__main__":
     print("=====================================================")
     print("This script prepares the database and guides you through")
     print("the first-time Instagram login to create 'session.json'.")
-    print("It is recommended to run this script on your LOCAL computer.")
     print("-----------------------------------------------------")
 
     reset_db_flag = "--reset-db" in sys.argv

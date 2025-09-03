@@ -10,44 +10,44 @@ from instagrapi.exceptions import LoginRequired
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 load_dotenv()
 
+INSTAGRAM_USERNAME = os.getenv("INSTAGRAM_USERNAME")
+INSTAGRAM_PASSWORD = os.getenv("INSTAGRAM_PASSWORD")
 SESSION_FILE = Path("session.json")
 
 # --- Helper Function ---
 
 def _get_instagrapi_client() -> Client:
     """
-    Handles client instantiation and session loading.
-    This function is designed to be run on the server. It will NOT
-    attempt a full username/password login to avoid triggering challenges.
-    It relies on a valid `session.json` file being present.
+    Handles client instantiation, session loading, and login.
+    This function will attempt a full login if the session is invalid.
     """
-    cl = Client()
-
-    if not SESSION_FILE.exists():
-        logging.error("CRITICAL: session.json not found. Please generate one on your local machine using `setup.py` and upload it to the server.")
+    if not all([INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD]):
+        logging.error("Missing Instagram credentials in .env file.")
         return None
 
-    try:
+    cl = Client()
+
+    if SESSION_FILE.exists():
         logging.info(f"Loading session from {SESSION_FILE}...")
         cl.load_settings(SESSION_FILE)
 
-        # Perform a lightweight API call to check if the session is valid.
-        # This will raise LoginRequired if the session is expired or invalid.
-        cl.get_timeline_feed()
-
-        logging.info("Session is valid.")
+    try:
+        # This login call will use the session if it's loaded and valid,
+        # otherwise it will perform a full login with username/password.
+        cl.login(INSTAGRAM_USERNAME, INSTAGRAM_PASSWORD)
+        cl.get_timeline_feed() # Verify session is truly working
+        logging.info("Session is valid and login successful.")
         return cl
-
     except LoginRequired:
-        logging.error("CRITICAL: The session in session.json is invalid or expired. Please generate a new one on your local machine using `setup.py` and re-upload it.")
-        return None
+        logging.error("Session is invalid. A new login attempt will be made, which may require a challenge code if run on a new server.")
+        # The login call above will handle the re-login attempt.
+        # If it fails again, it will raise an exception.
+        return None # Should not be reached if login raises
     except Exception as e:
-        logging.error(f"An unexpected error occurred during client session loading: {e}", exc_info=True)
+        logging.error(f"An unexpected error occurred during client login: {e}", exc_info=True)
         return None
 
 # --- Upload Functions ---
-# These functions now assume _get_instagrapi_client will provide a valid,
-# logged-in client or None.
 
 def upload_photo(path: str, caption: str) -> bool:
     logging.info(f"Attempting to upload photo from {path}...")

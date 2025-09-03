@@ -35,70 +35,53 @@
 
 ## 🚀 **Panduan Instalasi & Setup**
 
-Aplikasi ini menggunakan alur kerja yang kuat untuk menghindari pemicuan sistem keamanan Instagram. Setup dibagi menjadi dua bagian: setup satu kali di **komputer lokal** Anda, dan deployment di **server** Anda.
+Ikuti langkah-langkah berikut untuk menjalankan aplikasi di server Anda.
 
-### **Bagian 1: Pembuatan Sesi (di Komputer Lokal Anda)**
-
-Langkah terpenting adalah membuat file `session.json` di mesin yang tepercaya (komputer pribadi Anda) untuk menghindari tantangan login di server.
-
-1.  **Clone Repositori secara Lokal:**
+1.  **Clone Repositori:**
     ```bash
     git clone https://github.com/your-repo/your-project.git
     cd daily-content-uploader
     ```
 
-2.  **Install Dependencies secara Lokal:**
+2.  **Install Dependencies:**
     ```bash
     pip install -r requirements.txt
     ```
 
-3.  **Konfigurasi Environment Lokal:** Buat file `.env` dari contoh.
+3.  **Konfigurasi Environment:** Salin file contoh menjadi file `.env` baru.
     ```bash
     cp .env.example .env
     ```
-    Buka file `.env` dan isi `INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD` Anda.
+    Buka file `.env` dan isi semua kredensial yang dibutuhkan:
+    - `INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD`
+    - `WEB_USERNAME` dan `WEB_PASSWORD` (untuk login dasbor)
+    - `DATABASE_URL` (jika tidak menggunakan SQLite bawaan)
+    - `TIMEZONE` (misal: `Asia/Jakarta`)
 
-4.  **Jalankan Setup Interaktif secara Lokal:** Jalankan skrip `setup.py`.
+4.  **Jalankan Skrip Setup Interaktif:** Jalankan `setup.py` dari terminal server Anda.
     ```bash
     python3 setup.py
     ```
-    - Skrip akan memandu Anda melalui proses login Instagram.
-    - **Masukkan kode 2FA** yang dikirim ke email Anda saat diminta.
-    - Setelah berhasil, sebuah file `session.json` akan dibuat di direktori proyek Anda. File ini sangat penting.
+    - Skrip ini akan menginisialisasi database dan membuat akun pengguna web.
+    - Kemudian, ia akan mencoba login ke Instagram.
+    - **PENTING:** Instagram mungkin akan mengirimkan kode verifikasi (2FA) ke email Anda. Skrip akan berhenti dan meminta Anda memasukkan kode 6 digit di terminal.
+    - Setelah login berhasil, skrip akan membuat `session.json`. File ini membantu menjaga sesi login untuk menghindari tantangan di masa depan.
 
-### **Bagian 2: Deployment Server**
+### **Menjalankan Aplikasi**
 
-Sekarang, Anda akan men-deploy kode aplikasi dan file sesi yang telah dibuat ke server Anda.
+Aplikasi ini terdiri dari dua komponen utama yang harus dijalankan sebagai servis latar belakang yang persisten: **Server Web** dan **Servis Penjadwal**.
 
-1.  **Upload File Proyek:** Upload semua file proyek (kecuali `session.json` untuk saat ini) ke server Anda (misalnya, di `/www/wwwroot/domain.anda.com`).
-
-2.  **Konfigurasi Environment Server:**
-    - Buat file `.env` di server (`cp .env.example .env`).
-    - Isi `DATABASE_URL` Anda.
-    - Atur `WEB_USERNAME` dan `WEB_PASSWORD` untuk login dasbor Anda.
-    - Atur `TIMEZONE` Anda (misalnya, `Asia/Jakarta`).
-    - **Biarkan `INSTAGRAM_USERNAME` dan `INSTAGRAM_PASSWORD` kosong di server.** Ini penting untuk keamanan.
-
-3.  **Upload File Sesi:** Upload file `session.json` yang Anda buat di Bagian 1 secara aman ke direktori proyek di server Anda.
-
-4.  **Inisialisasi Database Server:**
-    - Masuk ke server Anda melalui SSH dan navigasikan ke direktori proyek.
-    - Jalankan skrip setup **tanpa bagian login** untuk menginisialisasi database dan membuat pengguna web.
+1.  **Jalankan Server Web:**
     ```bash
-    python3 setup.py
+    nohup gunicorn -c gunicorn_config.py main:app > gunicorn.log 2>&1 &
     ```
-    *(Karena INSTAGRAM_USERNAME kosong di .env server, skrip akan melewatkan bagian login interaktif).*
+    Perintah ini memulai server web Gunicorn di latar belakang dan menyimpan semua log-nya ke `gunicorn.log`.
 
-5.  **Jalankan Aplikasi:**
-    Jalankan server web dan penjadwal sebagai servis latar belakang yang persisten.
-    -   **Server Web:**
-        ```bash
-        nohup gunicorn -c gunicorn_config.py main:app > gunicorn.log 2>&1 &
-        ```
-    -   **Servis Penjadwal:**
-        ```bash
-        nohup python3 run_scheduler.py > scheduler.log 2>&1 &
-        ```
+2.  **Jalankan Servis Penjadwal:**
+    ```bash
+    nohup python3 run_scheduler.py > scheduler.log 2>&1 &
+    ```
+    Perintah ini memulai servis penjadwal di latar belakang dan menyimpan semua log-nya ke `scheduler.log`.
 
 Anda sekarang dapat mengakses dasbor Anda di `http://alamat_server_anda:PORT` dan login dengan `WEB_USERNAME` dan `WEB_PASSWORD` Anda.
 
@@ -106,7 +89,7 @@ Anda sekarang dapat mengakses dasbor Anda di `http://alamat_server_anda:PORT` da
 
 ## 🆘 **Troubleshooting**
 
-*   **Error `Session is invalid`:** File `session.json` Anda telah kedaluwarsa atau tidak valid. Anda harus mengulangi **Bagian 1** di komputer lokal Anda untuk membuat `session.json` yang baru, lalu upload ulang hanya file tersebut ke server Anda.
+*   **Error `challenge_required` atau `LoginRequired`:** Ini adalah langkah keamanan dari Instagram. Hentikan aplikasi, hapus `session.json` (`rm session.json`), dan jalankan ulang `python3 setup.py`. Anda mungkin perlu memasukkan kode 2FA yang baru. Jika ini terus terjadi, IP server Anda mungkin ditandai oleh Instagram.
 *   **Error Database (Contoh: "Unknown column"):** Ini bisa terjadi setelah pembaruan kode. Untuk memperbaikinya, Anda mungkin perlu me-reset database Anda. Jalankan skrip setup dengan flag `--reset-db` di server Anda. **Peringatan: Ini akan menghapus semua konten dan jadwal Anda yang ada.**
     ```bash
     python3 setup.py --reset-db

@@ -10,7 +10,7 @@ load_dotenv()
 
 from scheduler import execute_upload_logic
 from database import SessionLocal
-from models import Schedule
+from models import Schedule, Content
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(asctime)s - %(name)s - %(message)s')
@@ -64,16 +64,35 @@ async def check_and_run_schedules():
                             logger.info(f"Recurring job {schedule.id} has already run today at {schedule.last_run_at.astimezone(user_timezone)}.")
 
                 if run_job:
-                    logger.info(f"Executing job for schedule {schedule.id}...")
-                    # Pass the current db session to the execution logic
-                    await execute_upload_logic(db, schedule)
+                    logger.info(f"Preparing to execute job for schedule {schedule.id}...")
+                    content = db.query(Content).filter(Content.id == schedule.content_id).first()
 
-                    # After execution, update the last_run_at timestamp in UTC
-                    if schedule.status == 'recurring':
-                        schedule_in_db = db.query(Schedule).filter(Schedule.id == schedule.id).first()
-                        if schedule_in_db:
-                            schedule_in_db.last_run_at = now_utc
-                            db.commit()
+                    if not content:
+                        logger.error(f"Execution failed: Content {schedule.content_id} not found for schedule {schedule.id}.")
+                        schedule.status = "failed"
+                        schedule.error_message = "Content not found"
+                        db.commit()
+                        continue
+
+                    # Execute the upload logic, which is now DB-independent
+                    success = await execute_upload_logic(schedule, content)
+
+                    # Now, handle all database updates based on the result
+                    if success:
+                        if schedule.status == 'pending':
+                            schedule.status = 'completed'
+                            content.status = 'published'
+                            logger.info(f"One-time job {schedule.id} completed successfully.")
+                        elif schedule.status == 'recurring':
+                            schedule.day_counter += 1
+                            schedule.last_run_at = now_utc
+                            logger.info(f"Recurring job {schedule.id} completed successfully. Day counter is now {schedule.day_counter}.")
+                    else:
+                        schedule.status = 'failed'
+                        schedule.error_message = "Upload process failed. See logs for details."
+                        logger.error(f"Job {schedule.id} failed during execution.")
+
+                    db.commit()
 
             except Exception as e:
                 logger.error(f"Error processing schedule {schedule.id}: {e}", exc_info=True)
