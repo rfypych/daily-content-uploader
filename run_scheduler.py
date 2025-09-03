@@ -3,7 +3,7 @@ import logging
 import os
 import pytz
 from dotenv import load_dotenv
-from datetime import datetime, timezone, time
+from datetime import datetime, timezone
 
 # Load environment variables first
 load_dotenv()
@@ -19,9 +19,9 @@ logger = logging.getLogger(__name__)
 async def check_and_run_schedules():
     """
     The core function of the custom scheduler.
-    - Fetches all active schedules (`pending` or `recurring`).
-    - Checks if they are due to be run.
-    - Executes them if they are.
+    - Fetches all active schedules.
+    - Checks if they are due.
+    - Executes them and updates their state in the database.
     """
     db = SessionLocal()
     try:
@@ -43,9 +43,8 @@ async def check_and_run_schedules():
                 run_job = False
                 # --- Logic for one-time jobs ---
                 if schedule.status == 'pending':
-                    # Compare timezone-aware and naive datetimes correctly
                     if now_utc >= schedule.scheduled_time.replace(tzinfo=timezone.utc):
-                        logger.info(f"One-time job {schedule.id} is due (scheduled for {schedule.scheduled_time}).")
+                        logger.info(f"One-time job {schedule.id} is due.")
                         run_job = True
 
                 # --- Logic for recurring jobs ---
@@ -54,29 +53,33 @@ async def check_and_run_schedules():
                     user_timezone = pytz.timezone(user_timezone_str)
                     now_in_user_tz = datetime.now(user_timezone)
 
-                    # Check if it's the right time of day in the user's timezone
                     if now_in_user_tz.hour == schedule.hour and now_in_user_tz.minute == schedule.minute:
-                        # Check if it has already run today (in the user's timezone)
                         if schedule.last_run_at is None or schedule.last_run_at.astimezone(user_timezone).date() < now_in_user_tz.date():
-                            logger.info(f"Recurring job {schedule.id} is due (scheduled for {schedule.hour:02d}:{schedule.minute:02d} in {user_timezone_str}).")
+                            logger.info(f"Recurring job {schedule.id} is due.")
                             run_job = True
-                        else:
-                            logger.info(f"Recurring job {schedule.id} has already run today at {schedule.last_run_at.astimezone(user_timezone)}.")
 
                 if run_job:
-                    logger.info(f"Executing job for schedule {schedule.id}...")
-                    # Pass the current db session to the execution logic
-                    await execute_upload_logic(db, schedule)
+                    success = await execute_upload_logic(db, schedule)
 
-                    # After execution, update the last_run_at timestamp in UTC
-                    if schedule.status == 'recurring':
-                        schedule_in_db = db.query(Schedule).filter(Schedule.id == schedule.id).first()
-                        if schedule_in_db:
-                            schedule_in_db.last_run_at = now_utc
-                            db.commit()
+                    if success:
+                        if schedule.status == 'pending':
+                            schedule.status = 'completed'
+                            logger.info(f"Marking one-time job {schedule.id} as completed.")
+                        elif schedule.status == 'recurring':
+                            schedule.last_run_at = now_utc
+                            if schedule.use_day_counter:
+                                schedule.day_counter += 1
+                            logger.info(f"Recurring job {schedule.id} ran successfully. Updating last_run_at and day_counter.")
+                    else:
+                        schedule.status = 'failed'
+                        schedule.error_message = "Upload logic returned failure."
+                        logger.error(f"Marking job {schedule.id} as failed.")
+
+                    db.commit()
 
             except Exception as e:
                 logger.error(f"Error processing schedule {schedule.id}: {e}", exc_info=True)
+                db.rollback()
 
     finally:
         db.close()
