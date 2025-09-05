@@ -7,72 +7,49 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from scheduler import execute_recurring_job
+from run_scheduler import check_and_run_schedules
 from models import Schedule, Content
+from datetime import datetime, timedelta
+import pytz
 
 class TestSchedulerLogic(unittest.TestCase):
 
-    @patch('scheduler.SessionLocal')
-    @patch('scheduler.ContentUploader')
-    def test_execute_recurring_job_with_day_counter(self, MockContentUploader, MockSessionLocal):
+    @patch('run_scheduler.SessionLocal')
+    @patch('run_scheduler.execute_upload_logic', new_callable=AsyncMock)
+    @patch('run_scheduler.datetime')
+    def test_check_and_run_schedules_recurring_job(self, mock_datetime, mock_execute_upload_logic, MockSessionLocal):
         # --- 1. Setup Mocks ---
-
-        # Mock the ContentUploader instance and its method
-        mock_uploader_instance = MockContentUploader.return_value
-        mock_uploader_instance.upload_to_platform = AsyncMock(return_value=True)
-
-        # Mock the database session and its query capabilities
         mock_db_session = MockSessionLocal.return_value
+        mock_execute_upload_logic.return_value = True
 
-        # Mock the master schedule object that the DB will return
-        mock_master_schedule = Schedule(
+        # Mock the current time to ensure the job is due
+        user_timezone = pytz.timezone(os.getenv('TIMEZONE', 'UTC'))
+        mock_now = datetime(2023, 1, 1, 10, 30).astimezone(user_timezone)
+        mock_datetime.now.return_value = mock_now
+
+        # Mock the schedule object that the DB will return
+        mock_schedule = Schedule(
             id=1,
             content_id=101,
             status='recurring',
+            hour=10,
+            minute=30,
             use_day_counter=True,
-            day_counter=5
+            day_counter=5,
+            last_run_at=mock_now - timedelta(days=1)
         )
 
-        # Mock the content object that the DB will return
-        mock_content = Content(
-            id=101,
-            caption="This is the original caption."
-        )
-
-        # Configure the mock query chain
-        mock_query = MagicMock()
-
-        # When filter is called for the schedule, return the schedule mock
-        mock_query.filter.return_value.first.side_effect = [
-            mock_master_schedule, # First call gets the schedule
-            mock_content        # Second call gets the content
-        ]
-        mock_db_session.query.return_value = mock_query
+        mock_db_session.query.return_value.filter.return_value.all.return_value = [mock_schedule]
 
         # --- 2. Execute the function under test ---
-
-        # We need to run the async function in an event loop
-        asyncio.run(execute_recurring_job(recurring_schedule_id=1))
+        asyncio.run(check_and_run_schedules())
 
         # --- 3. Assertions ---
+        mock_execute_upload_logic.assert_called_once_with(mock_db_session, mock_schedule)
 
-        # Assert that the uploader was called
-        mock_uploader_instance.upload_to_platform.assert_called_once()
-
-        # Get the arguments that the uploader was called with
-        # The first argument is the 'content' object
-        call_args, call_kwargs = mock_uploader_instance.upload_to_platform.call_args
-        called_with_content = call_args[0]
-
-        # Assert the caption was correctly modified
-        expected_caption = "Day 5 - This is the original caption."
-        self.assertEqual(called_with_content.caption, expected_caption)
-
-        # Assert that the day_counter on the original schedule object was incremented
-        self.assertEqual(mock_master_schedule.day_counter, 6)
-
-        # Assert that db.commit() was called to save the incremented counter
-        mock_db_session.commit.assert_called()
+        self.assertEqual(mock_schedule.day_counter, 6)
+        self.assertEqual(mock_schedule.last_run_at.date(), mock_now.date())
+        mock_db_session.commit.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

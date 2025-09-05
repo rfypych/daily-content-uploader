@@ -3,6 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pathlib import Path
 import os
@@ -12,10 +13,12 @@ from datetime import datetime, timezone, timedelta
 import shutil
 import aiofiles
 from contextlib import asynccontextmanager
+from typing import List
 
 from database import SessionLocal, engine, Base, init_database, get_db
 from models import Content, Schedule, Account
 from automation import ContentUploader
+from utils import validate_file, MAX_FILE_SIZE
 import auth
 
 # Create database tables
@@ -201,17 +204,32 @@ async def delete_content(
     if not content:
         raise HTTPException(status_code=404, detail="Content not found")
 
-    if os.path.exists(content.file_path):
-        try:
-            os.remove(content.file_path)
-        except OSError as e:
-            logger.warning(f"Could not delete file {content.file_path}: {e}")
+    # Handle multi-file paths for albums
+    file_paths = content.file_path.split(',')
+
+    for file_path in file_paths:
+        # Sanitize path to prevent security issues, though paths are internally generated
+        safe_path = Path(file_path.strip())
+
+        # Basic check to ensure it's within the upload folder
+        if UPLOAD_FOLDER not in str(safe_path.parent):
+            logger.warning(f"Skipping potentially unsafe path: {file_path}")
+            continue
+
+        if safe_path.exists():
+            try:
+                os.remove(safe_path)
+                logger.info(f"Deleted file: {safe_path}")
+            except OSError as e:
+                logger.warning(f"Could not delete file {safe_path}: {e}")
+        else:
+            logger.warning(f"File not found, skipping deletion: {safe_path}")
 
     db.delete(content)
     db.commit()
 
-    logger.info(f"Content {content_id} deleted successfully")
-    return {"message": "Content deleted successfully"}
+    logger.info(f"Content {content_id} and associated files deleted successfully")
+    return {"message": "Content and associated files deleted successfully"}
 
 
 @app.post("/schedule/daily")
